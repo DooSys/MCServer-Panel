@@ -17,12 +17,21 @@ app.disable("x-powered-by");
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+const pocketBaseProxy = createProxyMiddleware({
+  target: config.pocketBaseUrl,
+  changeOrigin: true,
+  ws: true
+});
+
 app.use("/pb", createProxyMiddleware({
   target: config.pocketBaseUrl,
   changeOrigin: true,
   pathRewrite: { "^/pb": "" },
   ws: true
 }));
+
+app.use("/_", pocketBaseProxy);
+app.use(["/api/collections", "/api/files", "/api/realtime", "/api/batch"], pocketBaseProxy);
 
 app.use("/api", (request, response, next) => {
   if (request.path === "/health" || request.path === "/app/config" || request.path === "/auth/login") {

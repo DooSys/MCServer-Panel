@@ -28,7 +28,7 @@ ghcr.io/doosys/mcserver-panel:latest
 Image versionnee :
 
 ```text
-ghcr.io/doosys/mcserver-panel:1.1.8
+ghcr.io/doosys/mcserver-panel:1.1.9
 ```
 
 Si le package GHCR est prive :
@@ -91,7 +91,7 @@ Le conteneur cree automatiquement :
 PocketBase admin :
 
 ```text
-http://IP_DU_SERVEUR:8088/pb/_/
+http://IP_DU_SERVEUR:8088/_/
 ```
 
 Panel :

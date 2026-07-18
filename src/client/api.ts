@@ -18,7 +18,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    throw new Error(data?.error ?? `HTTP ${response.status}`);
+    const message = data?.error ?? `HTTP ${response.status}`;
+    if (response.status === 401 && /auth|session|token/i.test(message)) {
+      pb.authStore.clear();
+    }
+    throw new Error(message);
   }
   return data as T;
 }
