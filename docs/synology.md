@@ -28,7 +28,7 @@ ghcr.io/doosys/mcserver-panel:latest
 Image versionnee :
 
 ```text
-ghcr.io/doosys/mcserver-panel:1.1.2
+ghcr.io/doosys/mcserver-panel:1.1.4
 ```
 
 Si le package GHCR est prive :
@@ -52,7 +52,7 @@ cp docker-compose.example.yml docker-compose.yml
 cp .env.example .env
 ```
 
-Modifier `.env` avec le vrai mot de passe RCON et les chemins Synology.
+Modifier `.env` avec `SERVER`, `RCON_PASSWORD`, `MC_WORLD_PATH` et `PANEL_DATA_PATH`.
 
 Le panel doit joindre le conteneur Minecraft via un reseau Docker commun. Une fois seulement, sans reboot du serveur Minecraft :
 

@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.2`.
+- App version starts at `1.1.4`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.2 --no-git-tag-version
+npm version 1.1.4 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.2"
+git commit -m "Release 1.1.4"
 git push origin main
-git tag v1.1.2
-git push origin v1.1.2
+git tag v1.1.4
+git push origin v1.1.4
 ```
 
 ## Validation Commands

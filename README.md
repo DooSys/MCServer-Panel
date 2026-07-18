@@ -2,7 +2,7 @@
 
 MCServer Panel est une interface web moderne pour administrer un serveur Minecraft Java existant base sur `itzg/minecraft-server`. Le panel tourne dans son propre conteneur, communique avec Minecraft via RCON, lit/ecrit de facon controlee dans le volume `/mc-data`, et embarque PocketBase pour les comptes, les preferences et l'audit applicatif.
 
-Version actuelle : `1.1.2`.
+Version actuelle : `1.1.4`.
 
 ## Objectif du projet
 
@@ -62,7 +62,7 @@ Le Dockerfile est multi-stage :
 Build local manuel :
 
 ```bash
-docker build --build-arg APP_VERSION=1.1.2 -t ghcr.io/doosys/mcserver-panel:1.1.2 .
+docker build --build-arg APP_VERSION=1.1.4 -t ghcr.io/doosys/mcserver-panel:1.1.4 .
 ```
 
 Test local rapide apres build :
@@ -70,10 +70,10 @@ Test local rapide apres build :
 ```bash
 docker run --rm -p 8088:8080 \
   -e REQUIRE_AUTH=false \
-  -e MC_RCON_PASSWORD=dev \
+  -e RCON_PASSWORD=dev \
   -v "$PWD/.tmp/mc-data:/mc-data" \
   -v "$PWD/.tmp/pb_data:/app/pb_data" \
-  ghcr.io/doosys/mcserver-panel:1.1.2
+  ghcr.io/doosys/mcserver-panel:1.1.4
 ```
 
 ## Publication GitHub
@@ -83,7 +83,7 @@ Le workflow `.github/workflows/docker-image.yml` publie l'image sur GitHub Conta
 Tags produits :
 
 - `ghcr.io/doosys/mcserver-panel:latest` sur `main` ;
-- `ghcr.io/doosys/mcserver-panel:1.1.2` avec un tag Git `v1.1.2` ;
+- `ghcr.io/doosys/mcserver-panel:1.1.4` avec un tag Git `v1.1.4` ;
 - `ghcr.io/doosys/mcserver-panel:1.1` ;
 - tag court base sur le SHA.
 
@@ -92,10 +92,10 @@ Commandes de release typiques depuis WSL :
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.2"
+git commit -m "Release 1.1.4"
 git push origin main
-git tag v1.1.2
-git push origin v1.1.2
+git tag v1.1.4
+git push origin v1.1.4
 ```
 
 GitHub Actions doit avoir le droit `packages: write`, deja defini dans le workflow. Si l'image GHCR est privee, le Synology devra faire un `docker login ghcr.io` avec un token GitHub ayant le droit `read:packages`.
@@ -115,9 +115,10 @@ cp .env.example .env
 
 Modifier `.env` :
 
-- `MC_RCON_PASSWORD` avec le vrai mot de passe RCON du serveur existant ;
+- `SERVER` avec le nom DNS Docker ou IP du serveur Minecraft ;
+- `RCON_PASSWORD` avec le vrai mot de passe RCON du serveur existant ;
 - `MC_WORLD_PATH` avec le dossier monde existant ;
-- `PANEL_PB_DATA_PATH` avec le dossier persistant PocketBase ;
+- `PANEL_DATA_PATH` avec le dossier persistant du panel ;
 - `PB_SUPERUSER_*` et `PANEL_ADMIN_*` avec des secrets forts.
 
 Si le conteneur Minecraft existant s'appelle `minecraft`, raccorder le panel et Minecraft a un reseau commun une seule fois :
@@ -151,22 +152,25 @@ http://IP_DU_SERVEUR:8088/pb/_/
 
 | Variable | Defaut | Usage |
 | --- | --- | --- |
-| `MC_RCON_HOST` | `minecraft` | Nom DNS Docker du serveur Minecraft |
-| `MC_RCON_PORT` | `25575` | Port RCON interne |
-| `MC_RCON_PASSWORD` | vide | Mot de passe RCON, jamais affiche dans l'UI |
-| `MC_DATA_PATH` | `/mc-data` | Volume Minecraft monte en lecture/ecriture controlee |
+| `SERVER` | `minecraft` | Nom DNS Docker ou IP du serveur Minecraft existant |
+| `RCON_PORT` | `25575` | Port RCON interne du serveur existant |
+| `RCON_PASSWORD` | vide | Mot de passe RCON, jamais affiche dans l'UI |
+| `MC_WORLD_PATH` | `/volume1/...` | Dossier monde Minecraft existant monte dans le panel |
+| `PANEL_DATA_PATH` | `/volume1/docker/MCServer-panel/data` | Donnees persistantes du panel et de PocketBase |
+| `MC_DOCKER_NETWORK` | `MCServer-panel-net` | Reseau Docker externe commun avec Minecraft |
+| `MC_DATA_PATH` | `/mc-data` | Chemin interne du volume Minecraft dans le panel |
 | `MC_SERVER_FLAVOR` | vide | Force le runtime affiche si les logs ne suffisent pas |
 | `MC_VERSION` | vide | Version Minecraft affichee et fallback tag image |
 | `MC_DOCKER_IMAGE` | `itzg/minecraft-server` | Image Docker affichee dans le dashboard |
 | `MC_DOCKER_TAG` | vide | Tag image affiche dans le dashboard |
 | `ENABLE_IMAGE_UPDATE_CHECK` | `false` | Reserve a une future integration registry/Docker socket |
-| `APP_VERSION` | `1.1.2` | Version affichee pour MCServer-Panel |
+| `APP_VERSION` | `1.1.4` | Version affichee pour MCServer-Panel |
 | `APP_DOCKER_IMAGE` | `ghcr.io/doosys/mcserver-panel` | Image du panel affichee dans le header |
 | `APP_DOCKER_TAG` | `latest` | Tag de l'image du panel |
 | `PANEL_UPDATE_STATUS` | `not_checked` | Badge header: `not_checked`, `current`, `update_available` ou `unknown` |
 | `ENABLE_CATALOG` | `false` dans compose | Active la recherche externe Modrinth |
 | `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l'installation depuis le catalogue vers `/mc-data` |
-| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.2` | User-Agent envoye aux APIs externes |
+| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.4` | User-Agent envoye aux APIs externes |
 | `APP_PORT` | `8080` | Port interne du panel |
 | `POCKETBASE_DATA` | `/app/pb_data` | Donnees PocketBase persistantes |
 | `POCKETBASE_URL` | `http://127.0.0.1:8090` | URL interne PocketBase |

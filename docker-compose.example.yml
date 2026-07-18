@@ -5,11 +5,20 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Mapping clair depuis le .env utilisateur vers les variables internes du panel.
+      MC_RCON_HOST: "${SERVER}"
+      MC_RCON_PORT: "${RCON_PORT}"
+      MC_RCON_PASSWORD: "${RCON_PASSWORD}"
+      MC_DATA_PATH: "/mc-data"
+      POCKETBASE_DATA: "/app/pb_data"
     volumes:
       # Dossier monde existant du serveur Minecraft, monte dans le panel uniquement.
       # Ce compose ne gere pas le conteneur Minecraft et ne le redemarre pas.
       - ${MC_WORLD_PATH}:/mc-data
-      - ${PANEL_PB_DATA_PATH}:/app/pb_data
+
+      # Donnees persistantes propres au panel : PocketBase, comptes, roles, audit.
+      - ${PANEL_DATA_PATH}:/app/pb_data
     ports:
       - "8088:8080"
     networks:
