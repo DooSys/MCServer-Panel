@@ -54,5 +54,5 @@ RUN chmod +x /entrypoint.sh /init-pocketbase.sh \
 
 EXPOSE 8080
 VOLUME ["/app/pb_data", "/mc-data"]
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl -fsS "http://127.0.0.1:${APP_PORT}/panel-api/health" || exit 1
 CMD ["/entrypoint.sh"]

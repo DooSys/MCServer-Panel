@@ -6,7 +6,7 @@ RCON doit rester interne au reseau Docker. Ne pas exposer `25575:25575` dans le 
 
 ## Authentification
 
-PocketBase est proxyfie sous `/pb`. Le backend valide les tokens utilisateurs avec `auth-refresh` quand `REQUIRE_AUTH=true`.
+PocketBase est proxyfie sous `/_/` et `/api`; le client panel conserve `/pb` pour son auth store. Le backend valide les tokens utilisateurs avec `auth-refresh` quand `REQUIRE_AUTH=true`.
 
 Pour un LAN familial, garder tout de meme un reverse proxy avec TLS si l'acces sort de la machine locale. Pour un acces distant, privilegier VPN ou reverse proxy avec authentification forte.
 

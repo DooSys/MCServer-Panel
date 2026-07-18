@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.12`.
+- App version starts at `1.1.13`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.12 --no-git-tag-version
+npm version 1.1.13 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -47,7 +47,7 @@ Then update Docker/docs references to the same version.
 - GitHub Actions workflow: `.github/workflows/docker-image.yml`.
 - Push to `main` publishes `latest`.
 - Git tag `vX.Y.Z` publishes semver tags.
-- Synology compose should consume a pinned release tag such as `ghcr.io/doosys/mcserver-panel:1.1.12` during validation.
+- Synology compose should consume a pinned release tag such as `ghcr.io/doosys/mcserver-panel:1.1.13` during validation.
 - `docker-compose.example.yml` is panel-only; it must not define or manage the `itzg/minecraft-server` service during Synology validation.
 - The existing Minecraft container should be attached once to `MCServer-panel-net` with `docker network connect MCServer-panel-net minecraft`, avoiding a game server reboot.
 - If GHCR package is private, Synology needs `docker login ghcr.io` with a GitHub token that can `read:packages`.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.12"
+git commit -m "Release 1.1.13"
 git push origin main
-git tag v1.1.12
-git push origin v1.1.12
+git tag v1.1.13
+git push origin v1.1.13
 ```
 
 ## Validation Commands
@@ -98,7 +98,7 @@ Notes:
 - UI auth uses PocketBase user collection through `/pb` proxy.
 - Initial panel user is created by `scripts/init-pocketbase.mjs`.
 - Existing panel user password is updated from `PANEL_ADMIN_PASSWORD` on every init.
-- Browser login uses backend endpoint `/api/auth/login`, which proxies PocketBase auth and then stores the returned token in the PocketBase client auth store.
+- Browser login uses backend endpoint `/panel-api/auth/login`, which proxies PocketBase auth and then stores the returned token in the PocketBase client auth store.
 - Superuser PocketBase login is accepted as a first-run/admin fallback; `requireAuth` validates both `users` and `_superusers` tokens.
 - Preferred envs:
   - `PB_SUPERUSER_EMAIL`
@@ -139,26 +139,32 @@ Notes:
 ## RCON Diagnostics
 
 - Server status now exposes `rconHost`, `rconPort`, and `rconError`.
-- Authenticated endpoint `/api/diagnostics/rcon` tests TCP reachability before running RCON `list`.
+- Authenticated endpoint `/panel-api/diagnostics/rcon` tests TCP reachability before running RCON `list`.
 - Use it to distinguish Docker DNS/network issues from RCON password issues.
 
 ## Logs Integration
 
-- Version 1.1.12 adds /api/logs/sources and /api/logs/:source.
+- Version 1.1.13 adds /panel-api/logs/sources and /panel-api/logs/:source.
 - Sources are minecraft-container, panel-container, and minecraft-latest.
 - Docker container logs use the Docker Engine API over DOCKER_SOCKET_PATH; Synology compose mounts /var/run/docker.sock read-only.
 - UI supports source selection, filter, live refresh, tail size, and auto-scroll pause.
 
 ## PocketBase Admin Proxy
 
-- Version 1.1.12 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
-- Root PocketBase API prefixes /api/collections, /api/files, /api/realtime, and /api/batch are proxied before MCServer-panel API auth middleware.
+- Version 1.1.13 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
+- Root PocketBase API prefixes /api are proxied before MCServer-panel API auth middleware.
 - The old /pb proxy remains for the app PocketBase client, but UI links should point to /_/ for PocketBase admin.
 - Frontend apiFetch clears stale PocketBase tokens on 401 auth/session/token errors, which avoids repeated Invalid PocketBase session toasts after a container restart or password rotation.
 
 ## PocketBase Auth Regression Notes
 
-- Version 1.1.12 separates browser auth storage: MCServer-panel uses `mcserver_panel_auth`; PocketBase admin keeps the default `pocketbase_auth`.
+- Version 1.1.13 separates browser auth storage: MCServer-panel uses `mcserver_panel_auth`; PocketBase admin keeps the default `pocketbase_auth`.
 - The client removes legacy non-superuser `pocketbase_auth` values left by earlier panel builds, preventing the PocketBase admin UI from opening with a panel user token.
 - Backend `requireAuth` forwards refreshed PocketBase tokens in `x-pocketbase-token` and `x-pocketbase-record`; the frontend saves them after API calls.
 - This avoids immediate logout after `auth-refresh` and avoids repeated `Invalid PocketBase session` messages caused by stale rotated tokens.
+
+## API Namespace Split
+
+- Since 1.1.13, PocketBase owns `/api` and `/_/` at the public panel host.
+- MCServer-panel backend endpoints are mounted under `/panel-api`.
+- Frontend `apiFetch` must call `/panel-api`, not `/api`, to avoid breaking PocketBase admin dashboard calls such as `/api/settings`, `/api/health`, `/api/logs`, and `/api/collections`.

@@ -22,16 +22,8 @@ const pocketBaseProxy = createProxyMiddleware({
   ws: true
 });
 
-function isPocketBaseRoute(routePath: string) {
-  return routePath === "/_" || routePath.startsWith("/_/") ||
-    routePath === "/api/collections" || routePath.startsWith("/api/collections/") ||
-    routePath === "/api/files" || routePath.startsWith("/api/files/") ||
-    routePath === "/api/realtime" || routePath.startsWith("/api/realtime/") ||
-    routePath === "/api/batch" || routePath.startsWith("/api/batch/");
-}
-
 app.use((request, response, next) => {
-  if (isPocketBaseRoute(request.path)) {
+  if (request.path === "/_" || request.path.startsWith("/_/") || request.path === "/api" || request.path.startsWith("/api/")) {
     pocketBaseProxy(request, response, next);
     return;
   }
@@ -47,14 +39,14 @@ app.use("/pb", createProxyMiddleware({
 
 app.use(express.json({ limit: "1mb" }));
 
-app.use("/api", (request, response, next) => {
+app.use("/panel-api", (request, response, next) => {
   if (request.path === "/health" || request.path === "/app/config" || request.path === "/auth/login") {
     next();
     return;
   }
   requireAuth(request, response, next);
 });
-app.use("/api", apiRouter);
+app.use("/panel-api", apiRouter);
 
 app.use(express.static(clientDir));
 app.get("*", (_request, response) => {

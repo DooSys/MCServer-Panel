@@ -30,7 +30,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const auth = authHeader();
   if (auth.authorization) headers.set("authorization", auth.authorization);
 
-  const response = await fetch("/api" + path, { ...init, headers });
+  const response = await fetch("/panel-api" + path, { ...init, headers });
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
 
