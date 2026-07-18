@@ -129,3 +129,13 @@ h2 { font-size: 20px; }
 .icon-link { width: 40px; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); background: #fff; }
 .icon-link:hover { border-color: #9ab2c6; }
 @media (max-width: 560px) { .catalog-toolbar { justify-content: stretch; width: 100%; } .catalog-toolbar .search, .catalog-toolbar select, .catalog-toolbar button { width: 100%; } .catalog-card { grid-template-columns: 44px minmax(0, 1fr); } .catalog-card img, .catalog-card > svg { width: 44px; height: 44px; } }
+.logs-panel { display: grid; gap: 12px; }
+.logs-head { align-items: flex-start; }
+.logs-actions, .logs-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logs-actions select { min-width: 180px; }
+.logs-toolbar { justify-content: space-between; }
+.logs-toolbar .search { flex: 1 1 280px; }
+.check-control { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); white-space: nowrap; }
+.check-control input { min-height: auto; }
+.live-log { height: min(62vh, 720px); max-height: none; margin-top: 0; }
+@media (max-width: 720px) { .logs-actions, .logs-actions select, .logs-actions button, .logs-toolbar, .logs-toolbar .search { width: 100%; } }

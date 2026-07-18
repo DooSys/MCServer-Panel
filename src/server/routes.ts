@@ -3,15 +3,16 @@ import path from "node:path";
 import express from "express";
 import multer from "multer";
 import { GAMERULES } from "../shared/gamerules.js";
-import type { AddonPackage, PlayerSummary, ServerStatus } from "../shared/types.js";
+import type { AddonPackage, LogPayload, LogSource, LogSourceId, PlayerSummary, ServerStatus } from "../shared/types.js";
 import { auditLog } from "./audit.js";
 import { getCatalogVersions, installCatalogPackage, searchCatalog } from "./catalog.js";
 import { config } from "./config.js";
 import { toMinecraftGamerule, parseGameruleValue } from "./gameruleMapper.js";
+import { readDockerContainerLogs } from "./dockerLogs.js";
 import { detectLogEvents, latestLog, listDatapacks, readJsonFile, readServerProperties, readTextFile } from "./minecraftFiles.js";
 import { inspectPackage } from "./packageInspector.js";
 import { ensureMcDir, publicMcPath, withinMcData } from "./paths.js";
-import { commandAllowed, parseListResponse, runRcon } from "./rcon.js";
+import { commandAllowed, parseListResponse, runRcon, testRconTcp } from "./rcon.js";
 
 export const apiRouter = express.Router();
 
@@ -76,11 +77,46 @@ function asyncRoute(handler: express.RequestHandler): express.RequestHandler {
   return (request, response, next) => Promise.resolve(handler(request, response, next)).catch(next);
 }
 
+function configuredLogSources(): LogSource[] {
+  return [
+    { id: "minecraft-container", label: "Minecraft container", kind: "docker", detail: config.mcContainerName },
+    { id: "panel-container", label: "MCServer-panel container", kind: "docker", detail: config.panelContainerName },
+    { id: "minecraft-latest", label: "Minecraft latest.log", kind: "file", detail: "mc-data/logs/latest.log" }
+  ];
+}
+
+function logSourceById(id: string) {
+  return configuredLogSources().find((source) => source.id === id);
+}
+
+async function readLogPayload(sourceId: LogSourceId, tail: number): Promise<LogPayload> {
+  const source = logSourceById(sourceId);
+  if (!source) throw Object.assign(new Error("Unknown log source"), { status: 404 });
+
+  if (source.id === "minecraft-latest") {
+    const content = await latestLog().catch((error) => "Unable to read latest.log: " + (error instanceof Error ? error.message : String(error)));
+    return { source, content, detections: detectLogEvents(content), generatedAt: new Date().toISOString(), tail };
+  }
+
+  const container = source.id === "minecraft-container" ? config.mcContainerName : config.panelContainerName;
+  const dockerLogs = await readDockerContainerLogs(container, tail);
+  return {
+    source: { ...source, detail: dockerLogs.container },
+    content: dockerLogs.error ? "Unable to read Docker logs for " + dockerLogs.container + ": " + dockerLogs.error : dockerLogs.content,
+    detections: detectLogEvents(dockerLogs.content),
+    generatedAt: dockerLogs.generatedAt,
+    tail: dockerLogs.tail,
+    error: dockerLogs.error
+  };
+}
+
 async function statusPayload(): Promise<ServerStatus> {
   const props = await readServerProperties();
   const logContent = await latestLog().catch(() => '');
   const dockerImageTag = config.mcDockerTag || 'unknown';
   const base = {
+    rconHost: config.rconHost,
+    rconPort: config.rconPort,
     motd: props.motd,
     version: props.version,
     minecraftVersion: detectMinecraftVersion(logContent, props),
@@ -118,6 +154,7 @@ async function statusPayload(): Promise<ServerStatus> {
       playersOnline: 0,
       playersMax: null,
       players: [],
+      rconError: error instanceof Error ? error.message : "RCON unavailable",
       error: error instanceof Error ? error.message : "RCON unavailable"
     };
   }
@@ -140,24 +177,58 @@ apiRouter.post("/auth/login", asyncRoute(async (request, response) => {
     return;
   }
 
-  const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/users/auth-with-password`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ identity, password })
-  });
-  const text = await pbResponse.text();
-  const data = text ? JSON.parse(text) : null;
+  async function tryLogin(collection: "users" | "_superusers") {
+    const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/${collection}/auth-with-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ identity, password })
+    });
+    const text = await pbResponse.text();
+    const data = text ? JSON.parse(text) : null;
+    return { ok: pbResponse.ok, status: pbResponse.status, data, collection };
+  }
 
-  if (!pbResponse.ok) {
-    response.status(pbResponse.status).json({ error: data?.message ?? "Login failed", details: data?.data });
+  const userLogin = await tryLogin("users");
+  if (userLogin.ok) {
+    response.json({ ...userLogin.data, authCollection: "users" });
     return;
   }
 
-  response.json(data);
+  const superuserLogin = await tryLogin("_superusers");
+  if (superuserLogin.ok) {
+    response.json({ ...superuserLogin.data, authCollection: "_superusers" });
+    return;
+  }
+
+  response.status(userLogin.status || superuserLogin.status || 401).json({
+    error: userLogin.data?.message ?? superuserLogin.data?.message ?? "Login failed",
+    details: { users: userLogin.data?.data, superusers: superuserLogin.data?.data }
+  });
 }));
 
 apiRouter.get("/server/status", asyncRoute(async (_request, response) => {
   response.json(await statusPayload());
+}));
+
+apiRouter.get("/diagnostics/rcon", asyncRoute(async (_request, response) => {
+  const tcp = await testRconTcp();
+  let command: { ok: boolean; result?: string; error?: string } = { ok: false };
+
+  if (tcp.ok) {
+    try {
+      command = { ok: true, result: await runRcon("list") };
+    } catch (error) {
+      command = { ok: false, error: error instanceof Error ? error.message : "RCON command failed" };
+    }
+  }
+
+  response.json({
+    host: config.rconHost,
+    port: config.rconPort,
+    passwordConfigured: Boolean(config.rconPassword),
+    tcp,
+    command
+  });
 }));
 
 apiRouter.post("/server/quick-action", asyncRoute(async (request, response) => {
@@ -294,9 +365,18 @@ apiRouter.get("/files/read", asyncRoute(async (request, response) => {
   response.type("text/plain").send(await readTextFile(file));
 }));
 
+apiRouter.get("/logs/sources", (_request, response) => {
+  response.json({ sources: configuredLogSources(), dockerSocketPath: config.dockerSocketPath });
+});
+
 apiRouter.get("/logs/latest", asyncRoute(async (_request, response) => {
-  const content = await latestLog().catch((error) => `Unable to read latest.log: ${error instanceof Error ? error.message : error}`);
-  response.json({ content, detections: detectLogEvents(content) });
+  response.json(await readLogPayload("minecraft-latest", config.logTailLines));
+}));
+
+apiRouter.get("/logs/:source", asyncRoute(async (request, response) => {
+  const source = String(request.params.source) as LogSourceId;
+  const tail = Number(request.query.tail ?? config.logTailLines);
+  response.json(await readLogPayload(source, tail));
 }));
 
 apiRouter.get("/catalog/search", asyncRoute(async (request, response) => {

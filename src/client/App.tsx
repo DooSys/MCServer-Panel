@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, Moon, PackageSearch, Play, RefreshCw, Save, Search, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
+import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, Moon, PackageSearch, Pause, Play, RefreshCw, Save, Search, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
 import { apiFetch, loginWithPassword, pb, postJson } from './api';
 import { localizeRule, normalizeLanguage, profileLabel, t } from './i18n';
 import type { Language, TranslationKey } from './i18n';
-import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, GameruleState, LogDetection, PlayerSummary, ServerStatus } from '../shared/types';
+import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, GameruleState, LogPayload, LogSource, LogSourceId, PlayerSummary, ServerStatus } from '../shared/types';
 import { RECOMMENDED_PROFILES } from '../shared/gamerules';
 
 type Page = 'dashboard' | 'console' | 'players' | 'gamerules' | 'addons' | 'catalog' | 'files' | 'logs' | 'settings' | 'users';
@@ -65,13 +65,13 @@ function updateBadgeClass(status?: ServerStatus['panelUpdate']) {
 }
 
 function TopBar({ status, onRefresh, language, setLanguage }: { status: ServerStatus | null; onRefresh: () => Promise<void>; language: Language; setLanguage: (language: Language) => void }) {
-  return <header className="topbar"><div><p className="eyebrow">{t(language, 'serverRuntime')}</p><h1>{status?.motd || 'Minecraft'}</h1></div><div className="status-strip"><LanguageSwitch language={language} setLanguage={setLanguage} /><a className="header-link" href="/pb/_/" target="_blank">{t(language, 'pbAdmin')}</a><span className={status?.rconOk ? 'pill ok' : 'pill down'}>{status?.rconOk ? 'RCON OK' : 'RCON off'}</span><span className={updateBadgeClass(status?.panelUpdate)}>{t(language, 'panelUpdate')}: {updateBadgeLabel(language, status?.panelUpdate)}</span><span className="pill">{status?.playersOnline ?? 0}/{status?.playersMax ?? '?'} {t(language, 'players')}</span><button className="icon-button" title={t(language, 'refresh')} onClick={() => onRefresh()}><RefreshCw size={18} /></button></div></header>;
+  return <header className="topbar"><div><p className="eyebrow">{t(language, 'serverRuntime')}</p><h1>{status?.motd || 'Minecraft'}</h1></div><div className="status-strip"><LanguageSwitch language={language} setLanguage={setLanguage} /><a className="header-link" href="/pb/_/" target="_blank">{t(language, 'pbAdmin')}</a><span className={status?.rconOk ? 'pill ok' : 'pill down'} title={`${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575} ${status?.rconError ?? status?.error ?? ''}`}>{status?.rconOk ? 'RCON OK' : `RCON off ${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575}`}</span><span className={updateBadgeClass(status?.panelUpdate)}>{t(language, 'panelUpdate')}: {updateBadgeLabel(language, status?.panelUpdate)}</span><span className="pill">{status?.playersOnline ?? 0}/{status?.playersMax ?? '?'} {t(language, 'players')}</span><button className="icon-button" title={t(language, 'refresh')} onClick={() => onRefresh()}><RefreshCw size={18} /></button></div></header>;
 }
 
 function Dashboard({ status, setToast, refreshStatus, language }: PageProps) {
   const [say, setSay] = useState('');
   const cards = [
-    [t(language, 'state'), status?.online ? t(language, 'online') : t(language, 'offline'), status?.error ?? t(language, 'rconChecked')],
+    [t(language, 'state'), status?.online ? t(language, 'online') : t(language, 'offline'), status?.rconOk ? `${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575}` : `${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575} - ${status?.rconError ?? status?.error ?? 'RCON unavailable'}`],
     [t(language, 'serverFlavor'), status?.serverFlavor ?? t(language, 'unknown'), status?.type ?? 'itzg/java'],
     [t(language, 'minecraftVersion'), status?.minecraftVersion ?? t(language, 'unknown'), t(language, 'readFromServerProperties')],
     [t(language, 'navPlayers'), `${status?.playersOnline ?? 0}/${status?.playersMax ?? '?'}`, status?.players.join(', ') || t(language, 'noPlayers')],
@@ -169,9 +169,52 @@ function FilesPage({ setToast, language }: PageProps) {
 }
 
 function LogsPage({ setToast, language }: PageProps) {
-  const [content, setContent] = useState(''); const [detections, setDetections] = useState<LogDetection[]>([]); const [query, setQuery] = useState(''); async function load() { const data = await apiFetch<{ content: string; detections: LogDetection[] }>('/logs/latest'); setContent(data.content); setDetections(data.detections); } useEffect(() => { load().catch((error) => setToast({ type: 'error', message: error.message })); }, []); const filtered = useMemo(() => content.split(/\r?\n/).filter((line) => line.toLowerCase().includes(query.toLowerCase())).join('\n'), [content, query]);
-  return <section className="panel page-panel"><div className="panel-head"><h2>{t(language, 'navLogs')}</h2><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, 'filter')} /></div></div><div className="detections">{detections.slice(0, 8).map((item, index) => <span className="pill warn" key={index}>{item.type}</span>)}</div><pre className="log-view">{filtered}</pre></section>;
+  const [sources, setSources] = useState<LogSource[]>([]);
+  const [source, setSource] = useState<LogSourceId>("minecraft-container");
+  const [content, setContent] = useState("");
+  const [detections, setDetections] = useState<LogPayload["detections"]>([]);
+  const [query, setQuery] = useState("");
+  const [tail, setTail] = useState(400);
+  const [live, setLive] = useState(true);
+  const [followScroll, setFollowScroll] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState("");
+  const [error, setError] = useState("");
+  const logRef = useRef<HTMLPreElement | null>(null);
+
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
+    try {
+      const data = await apiFetch<LogPayload>("/logs/" + source + "?tail=" + tail);
+      setContent(data.content);
+      setDetections(data.detections);
+      setLastUpdate(data.generatedAt);
+      setError(data.error ?? "");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t(language, "logUnavailable");
+      setError(message);
+      setToast({ type: "error", message });
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    apiFetch<{ sources: LogSource[] }>("/logs/sources")
+      .then((data) => setSources(data.sources))
+      .catch((err) => setToast({ type: "error", message: err instanceof Error ? err.message : t(language, "logUnavailable") }));
+  }, []);
+
+  useEffect(() => { load().catch(() => undefined); }, [source, tail]);
+  useEffect(() => { if (!live) return; const timer = window.setInterval(() => load(true).catch(() => undefined), 2500); return () => window.clearInterval(timer); }, [source, tail, live]);
+  useEffect(() => { if (followScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [content, query, followScroll]);
+
+  const filtered = useMemo(() => content.split(/\r?\n/).filter((line) => line.toLowerCase().includes(query.toLowerCase())).join("\n"), [content, query]);
+  const selected = sources.find((item) => item.id === source);
+
+  return <section className="panel page-panel logs-panel"><div className="panel-head logs-head"><div><h2>{t(language, "navLogs")}</h2><span>{selected?.label ?? t(language, "logSource")} - {selected?.detail ?? source}</span></div><div className="logs-actions"><select value={source} onChange={(event) => setSource(event.target.value as LogSourceId)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select value={tail} onChange={(event) => setTail(Number(event.target.value))}><option value={100}>100</option><option value={400}>400</option><option value={1000}>1000</option><option value={2500}>2500</option></select><button onClick={() => setLive((value) => !value)} title={live ? t(language, "pauseLive") : t(language, "resumeLive")}>{live ? <Pause size={16} /> : <Play size={16} />}{live ? t(language, "live") : t(language, "paused")}</button><button onClick={() => load()} disabled={loading}><RefreshCw size={16} />{t(language, "refresh")}</button></div></div><div className="logs-toolbar"><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, "filter")} /></div><label className="check-control"><input type="checkbox" checked={followScroll} onChange={(event) => setFollowScroll(event.target.checked)} />{t(language, "followScroll")}</label><span className="muted">{t(language, "tailLines")}: {tail}</span>{lastUpdate && <span className="muted">{t(language, "lastUpdate")}: {new Date(lastUpdate).toLocaleTimeString()}</span>}</div>{error && <p className="error-text">{error}</p>}<div className="detections">{detections.slice(0, 8).map((item, index) => <span className="pill warn" key={index}>{item.type}</span>)}</div><pre className="log-view live-log" ref={logRef}>{filtered || t(language, "noResults")}</pre></section>;
 }
+
 
 function SettingsPage({ language }: PageProps) { return <section className="panel page-panel"><h2>{t(language, 'serverSettings')}</h2><p>{t(language, 'settingsText')}</p></section>; }
 function UsersPage({ language }: PageProps) { return <section className="panel page-panel"><h2>{t(language, 'usersRoles')}</h2><p>{t(language, 'usersText')}</p><a className="button-link" href="/pb/_/" target="_blank">{t(language, 'openPocketBase')}</a></section>; }

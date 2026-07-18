@@ -5,13 +5,25 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      authCollection?: "users" | "_superusers";
     }
   }
+}
+
+async function refreshPocketBaseAuth(token: string, collection: "users" | "_superusers") {
+  const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/${collection}/auth-refresh`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` }
+  });
+
+  if (!pbResponse.ok) return null;
+  return pbResponse.json() as Promise<{ record?: { id?: string } }>;
 }
 
 export async function requireAuth(request: Request, response: Response, next: NextFunction) {
   if (process.env.REQUIRE_AUTH === "false") {
     request.userId = "local-dev";
+    request.authCollection = "users";
     next();
     return;
   }
@@ -24,19 +36,23 @@ export async function requireAuth(request: Request, response: Response, next: Ne
   }
 
   try {
-    const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/users/auth-refresh`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}` }
-    });
-
-    if (!pbResponse.ok) {
-      response.status(401).json({ error: "Invalid PocketBase session" });
+    const userPayload = await refreshPocketBaseAuth(token, "users");
+    if (userPayload) {
+      request.userId = userPayload.record?.id;
+      request.authCollection = "users";
+      next();
       return;
     }
 
-    const payload = (await pbResponse.json()) as { record?: { id?: string } };
-    request.userId = payload.record?.id;
-    next();
+    const superuserPayload = await refreshPocketBaseAuth(token, "_superusers");
+    if (superuserPayload) {
+      request.userId = superuserPayload.record?.id;
+      request.authCollection = "_superusers";
+      next();
+      return;
+    }
+
+    response.status(401).json({ error: "Invalid PocketBase session" });
   } catch {
     response.status(503).json({ error: "PocketBase auth unavailable" });
   }

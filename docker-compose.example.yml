@@ -12,6 +12,9 @@ services:
       MC_RCON_PASSWORD: "${RCON_PASSWORD}"
       MC_DATA_PATH: "/mc-data"
       POCKETBASE_DATA: "/app/pb_data"
+      MC_CONTAINER_NAME: "${MC_CONTAINER_NAME}"
+      PANEL_CONTAINER_NAME: "${PANEL_CONTAINER_NAME}"
+      DOCKER_SOCKET_PATH: "${DOCKER_SOCKET_PATH}"
     volumes:
       # Dossier monde existant du serveur Minecraft, monte dans le panel uniquement.
       # Ce compose ne gere pas le conteneur Minecraft et ne le redemarre pas.
@@ -19,6 +22,10 @@ services:
 
       # Donnees persistantes propres au panel : PocketBase, comptes, roles, audit.
       - ${PANEL_DATA_PATH}:/app/pb_data
+
+      # Lecture des logs Docker des conteneurs Minecraft et MCServer-panel.
+      # Necessaire pour afficher docker logs depuis l interface.
+      - ${DOCKER_SOCKET_PATH}:/var/run/docker.sock:ro
     ports:
       - "8088:8080"
     networks:

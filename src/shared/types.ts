@@ -1,6 +1,9 @@
 export type ServerStatus = {
   online: boolean;
   rconOk: boolean;
+  rconHost?: string;
+  rconPort?: number;
+  rconError?: string;
   playersOnline: number;
   playersMax: number | null;
   players: string[];
@@ -119,4 +122,22 @@ export type CatalogInstallResult = {
 export type LogDetection = {
   type: "error" | "warn" | "rcon" | "crash" | "join" | "whitelist" | "datapack" | "save";
   line: string;
+};
+
+export type LogSourceId = "minecraft-container" | "panel-container" | "minecraft-latest";
+
+export type LogSource = {
+  id: LogSourceId;
+  label: string;
+  kind: "docker" | "file";
+  detail: string;
+};
+
+export type LogPayload = {
+  source: LogSource;
+  content: string;
+  detections: LogDetection[];
+  generatedAt: string;
+  tail: number;
+  error?: string;
 };

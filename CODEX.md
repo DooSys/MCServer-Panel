@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.5`.
+- App version starts at `1.1.8`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.5 --no-git-tag-version
+npm version 1.1.8 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.5"
+git commit -m "Release 1.1.8"
 git push origin main
-git tag v1.1.5
-git push origin v1.1.5
+git tag v1.1.8
+git push origin v1.1.8
 ```
 
 ## Validation Commands
@@ -99,6 +99,7 @@ Notes:
 - Initial panel user is created by `scripts/init-pocketbase.mjs`.
 - Existing panel user password is updated from `PANEL_ADMIN_PASSWORD` on every init.
 - Browser login uses backend endpoint `/api/auth/login`, which proxies PocketBase auth and then stores the returned token in the PocketBase client auth store.
+- Superuser PocketBase login is accepted as a first-run/admin fallback; `requireAuth` validates both `users` and `_superusers` tokens.
 - Preferred envs:
   - `PB_SUPERUSER_EMAIL`
   - `PB_SUPERUSER_PASSWORD`
@@ -134,3 +135,16 @@ Notes:
 - Keep project and command guidance in WSL/Linux form.
 - The target deployment is Synology Docker/Container Manager.
 - Prefer practical implementation and validation over long theory.
+
+## RCON Diagnostics
+
+- Server status now exposes `rconHost`, `rconPort`, and `rconError`.
+- Authenticated endpoint `/api/diagnostics/rcon` tests TCP reachability before running RCON `list`.
+- Use it to distinguish Docker DNS/network issues from RCON password issues.
+
+## Logs Integration
+
+- Version 1.1.8 adds /api/logs/sources and /api/logs/:source.
+- Sources are minecraft-container, panel-container, and minecraft-latest.
+- Docker container logs use the Docker Engine API over DOCKER_SOCKET_PATH; Synology compose mounts /var/run/docker.sock read-only.
+- UI supports source selection, filter, live refresh, tail size, and auto-scroll pause.

@@ -1,3 +1,4 @@
+import net from "node:net";
 import { Rcon } from "rcon-client";
 import { config } from "./config.js";
 
@@ -65,4 +66,20 @@ export function parseListResponse(response: string) {
     max: Number(match[2]),
     players
   };
+}
+
+export function testRconTcp(timeoutMs = DEFAULT_TIMEOUT_MS) {
+  return new Promise<{ ok: boolean; error?: string; elapsedMs: number }>((resolve) => {
+    const started = Date.now();
+    const socket = net.createConnection({ host: config.rconHost, port: config.rconPort });
+    const finish = (ok: boolean, error?: string) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve({ ok, error, elapsedMs: Date.now() - started });
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false, `TCP timeout after ${timeoutMs}ms`));
+    socket.once("error", (error) => finish(false, error.message));
+  });
 }

@@ -2,7 +2,7 @@
 
 MCServer Panel est une interface web moderne pour administrer un serveur Minecraft Java existant base sur `itzg/minecraft-server`. Le panel tourne dans son propre conteneur, communique avec Minecraft via RCON, lit/ecrit de facon controlee dans le volume `/mc-data`, et embarque PocketBase pour les comptes, les preferences et l'audit applicatif.
 
-Version actuelle : `1.1.5`.
+Version actuelle : `1.1.8`.
 
 ## Objectif du projet
 
@@ -62,7 +62,7 @@ Le Dockerfile est multi-stage :
 Build local manuel :
 
 ```bash
-docker build --build-arg APP_VERSION=1.1.5 -t ghcr.io/doosys/mcserver-panel:1.1.5 .
+docker build --build-arg APP_VERSION=1.1.8 -t ghcr.io/doosys/mcserver-panel:1.1.8 .
 ```
 
 Test local rapide apres build :
@@ -73,7 +73,7 @@ docker run --rm -p 8088:8080 \
   -e RCON_PASSWORD=dev \
   -v "$PWD/.tmp/mc-data:/mc-data" \
   -v "$PWD/.tmp/pb_data:/app/pb_data" \
-  ghcr.io/doosys/mcserver-panel:1.1.5
+  ghcr.io/doosys/mcserver-panel:1.1.8
 ```
 
 ## Publication GitHub
@@ -83,7 +83,7 @@ Le workflow `.github/workflows/docker-image.yml` publie l'image sur GitHub Conta
 Tags produits :
 
 - `ghcr.io/doosys/mcserver-panel:latest` sur `main` ;
-- `ghcr.io/doosys/mcserver-panel:1.1.5` avec un tag Git `v1.1.5` ;
+- `ghcr.io/doosys/mcserver-panel:1.1.8` avec un tag Git `v1.1.8` ;
 - `ghcr.io/doosys/mcserver-panel:1.1` ;
 - tag court base sur le SHA.
 
@@ -92,10 +92,10 @@ Commandes de release typiques depuis WSL :
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.5"
+git commit -m "Release 1.1.8"
 git push origin main
-git tag v1.1.5
-git push origin v1.1.5
+git tag v1.1.8
+git push origin v1.1.8
 ```
 
 GitHub Actions doit avoir le droit `packages: write`, deja defini dans le workflow. Si l'image GHCR est privee, le Synology devra faire un `docker login ghcr.io` avec un token GitHub ayant le droit `read:packages`.
@@ -164,13 +164,13 @@ http://IP_DU_SERVEUR:8088/pb/_/
 | `MC_DOCKER_IMAGE` | `itzg/minecraft-server` | Image Docker affichee dans le dashboard |
 | `MC_DOCKER_TAG` | vide | Tag image affiche dans le dashboard |
 | `ENABLE_IMAGE_UPDATE_CHECK` | `false` | Reserve a une future integration registry/Docker socket |
-| `APP_VERSION` | `1.1.5` | Version affichee pour MCServer-Panel |
+| `APP_VERSION` | `1.1.8` | Version affichee pour MCServer-Panel |
 | `APP_DOCKER_IMAGE` | `ghcr.io/doosys/mcserver-panel` | Image du panel affichee dans le header |
 | `APP_DOCKER_TAG` | `latest` | Tag de l'image du panel |
 | `PANEL_UPDATE_STATUS` | `not_checked` | Badge header: `not_checked`, `current`, `update_available` ou `unknown` |
 | `ENABLE_CATALOG` | `false` dans compose | Active la recherche externe Modrinth |
 | `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l'installation depuis le catalogue vers `/mc-data` |
-| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.5` | User-Agent envoye aux APIs externes |
+| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.8` | User-Agent envoye aux APIs externes |
 | `APP_PORT` | `8080` | Port interne du panel |
 | `POCKETBASE_DATA` | `/app/pb_data` | Donnees PocketBase persistantes |
 | `POCKETBASE_URL` | `http://127.0.0.1:8090` | URL interne PocketBase |
@@ -215,3 +215,17 @@ npm test
 - Les suppressions/remplacements creent un backup dans `/mc-data/.mcserver-panel-backups`.
 
 Voir aussi [docs/security.md](docs/security.md) et [docs/synology.md](docs/synology.md).
+
+## Logs Panel Et Minecraft
+
+La page Logs affiche trois sources distinctes :
+
+- Minecraft container : equivalent a docker logs minecraft, via MC_CONTAINER_NAME.
+- MCServer-panel container : logs du panel, PocketBase et supervisord, via PANEL_CONTAINER_NAME.
+- Minecraft latest.log : lecture fichier de /mc-data/logs/latest.log, utile meme sans acces Docker.
+
+Pour les deux sources Docker, le socket Docker doit etre monte en lecture seule dans le conteneur du panel :
+
+    - ${DOCKER_SOCKET_PATH}:/var/run/docker.sock:ro
+
+Variables associees : MC_CONTAINER_NAME, PANEL_CONTAINER_NAME, DOCKER_SOCKET_PATH et LOG_TAIL_LINES.
