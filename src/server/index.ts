@@ -15,12 +15,27 @@ const clientDir = path.resolve(dirname, "../client");
 
 app.disable("x-powered-by");
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
 
 const pocketBaseProxy = createProxyMiddleware({
   target: config.pocketBaseUrl,
   changeOrigin: true,
   ws: true
+});
+
+function isPocketBaseRoute(routePath: string) {
+  return routePath === "/_" || routePath.startsWith("/_/") ||
+    routePath === "/api/collections" || routePath.startsWith("/api/collections/") ||
+    routePath === "/api/files" || routePath.startsWith("/api/files/") ||
+    routePath === "/api/realtime" || routePath.startsWith("/api/realtime/") ||
+    routePath === "/api/batch" || routePath.startsWith("/api/batch/");
+}
+
+app.use((request, response, next) => {
+  if (isPocketBaseRoute(request.path)) {
+    pocketBaseProxy(request, response, next);
+    return;
+  }
+  next();
 });
 
 app.use("/pb", createProxyMiddleware({
@@ -30,8 +45,7 @@ app.use("/pb", createProxyMiddleware({
   ws: true
 }));
 
-app.use("/_", pocketBaseProxy);
-app.use(["/api/collections", "/api/files", "/api/realtime", "/api/batch"], pocketBaseProxy);
+app.use(express.json({ limit: "1mb" }));
 
 app.use("/api", (request, response, next) => {
   if (request.path === "/health" || request.path === "/app/config" || request.path === "/auth/login") {
@@ -54,5 +68,5 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 });
 
 app.listen(config.appPort, () => {
-  console.log(`[mcserver-panel] listening on :${config.appPort}`);
+  console.log("[mcserver-panel] listening on :" + config.appPort);
 });
