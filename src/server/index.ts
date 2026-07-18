@@ -25,7 +25,7 @@ app.use("/pb", createProxyMiddleware({
 }));
 
 app.use("/api", (request, response, next) => {
-  if (request.path === "/health" || request.path === "/app/config") {
+  if (request.path === "/health" || request.path === "/app/config" || request.path === "/auth/login") {
     next();
     return;
   }

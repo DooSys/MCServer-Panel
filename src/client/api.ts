@@ -26,3 +26,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
   return apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) });
 }
+
+export async function loginWithPassword(identity: string, password: string) {
+  const data = await postJson<{ token: string; record: Record<string, unknown> }>('/auth/login', { identity, password });
+  pb.authStore.save(data.token, data.record as never);
+  return data;
+}

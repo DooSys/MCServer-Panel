@@ -131,6 +131,31 @@ apiRouter.get("/app/config", (_request, response) => {
   response.json({ pocketBaseUrl: "/pb", publicUrl: config.publicUrl, authRequired: process.env.REQUIRE_AUTH !== "false" });
 });
 
+apiRouter.post("/auth/login", asyncRoute(async (request, response) => {
+  const identity = String((request.body as { identity?: string }).identity ?? "").trim();
+  const password = String((request.body as { password?: string }).password ?? "");
+
+  if (!identity || !password) {
+    response.status(400).json({ error: "Missing identity or password" });
+    return;
+  }
+
+  const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/users/auth-with-password`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ identity, password })
+  });
+  const text = await pbResponse.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!pbResponse.ok) {
+    response.status(pbResponse.status).json({ error: data?.message ?? "Login failed", details: data?.data });
+    return;
+  }
+
+  response.json(data);
+}));
+
 apiRouter.get("/server/status", asyncRoute(async (_request, response) => {
   response.json(await statusPayload());
 }));

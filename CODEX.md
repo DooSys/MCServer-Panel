@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.4`.
+- App version starts at `1.1.5`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.4 --no-git-tag-version
+npm version 1.1.5 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.4"
+git commit -m "Release 1.1.5"
 git push origin main
-git tag v1.1.4
-git push origin v1.1.4
+git tag v1.1.5
+git push origin v1.1.5
 ```
 
 ## Validation Commands
@@ -97,6 +97,8 @@ Notes:
 
 - UI auth uses PocketBase user collection through `/pb` proxy.
 - Initial panel user is created by `scripts/init-pocketbase.mjs`.
+- Existing panel user password is updated from `PANEL_ADMIN_PASSWORD` on every init.
+- Browser login uses backend endpoint `/api/auth/login`, which proxies PocketBase auth and then stores the returned token in the PocketBase client auth store.
 - Preferred envs:
   - `PB_SUPERUSER_EMAIL`
   - `PB_SUPERUSER_PASSWORD`

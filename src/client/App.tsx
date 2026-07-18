@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, Moon, PackageSearch, Play, RefreshCw, Save, Search, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
-import { apiFetch, pb, postJson } from './api';
+import { apiFetch, loginWithPassword, pb, postJson } from './api';
 import { localizeRule, normalizeLanguage, profileLabel, t } from './i18n';
 import type { Language, TranslationKey } from './i18n';
 import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, GameruleState, LogDetection, PlayerSummary, ServerStatus } from '../shared/types';
@@ -46,9 +46,9 @@ function LanguageSwitch({ language, setLanguage }: { language: Language; setLang
 }
 
 function Login({ language, setLanguage }: { language: Language; setLanguage: (language: Language) => void }) {
-  const [identity, setIdentity] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState('');
-  async function submit(event: FormEvent) { event.preventDefault(); setError(''); try { await pb.collection('users').authWithPassword(identity, password); } catch (err) { setError(err instanceof Error ? err.message : t(language, 'loginFailed')); } }
-  return <div className="login-screen"><form className="login-card" onSubmit={submit}><div className="login-top"><div className="brand big"><Server size={28} /><span>MCServer Panel</span></div><LanguageSwitch language={language} setLanguage={setLanguage} /></div><label>{t(language, 'emailOrUser')}<input value={identity} onChange={(event) => setIdentity(event.target.value)} autoFocus /></label><label>{t(language, 'password')}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" /></label>{error && <p className="error-text">{error}</p>}<button className="primary">{t(language, 'login')}</button></form></div>;
+  const [identity, setIdentity] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
+  async function submit(event: FormEvent) { event.preventDefault(); if (loading) return; setError(''); setLoading(true); try { await loginWithPassword(identity, password); } catch (err) { setError(err instanceof Error ? err.message : t(language, 'loginFailed')); } finally { setLoading(false); } }
+  return <div className="login-screen"><form className="login-card" onSubmit={submit}><div className="login-top"><div className="brand big"><Server size={28} /><span>MCServer Panel</span></div><LanguageSwitch language={language} setLanguage={setLanguage} /></div><label>{t(language, 'emailOrUser')}<input value={identity} onChange={(event) => setIdentity(event.target.value)} autoFocus disabled={loading} /></label><label>{t(language, 'password')}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" disabled={loading} /></label>{error && <p className="error-text">{error}</p>}<button className="primary" disabled={loading}>{loading ? 'Connexion...' : t(language, 'login')}</button></form></div>;
 }
 
 

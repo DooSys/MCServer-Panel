@@ -28,7 +28,7 @@ ghcr.io/doosys/mcserver-panel:latest
 Image versionnee :
 
 ```text
-ghcr.io/doosys/mcserver-panel:1.1.4
+ghcr.io/doosys/mcserver-panel:1.1.5
 ```
 
 Si le package GHCR est prive :

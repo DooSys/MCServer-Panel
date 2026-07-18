@@ -88,7 +88,14 @@ const panelPassword = process.env.PANEL_ADMIN_PASSWORD ?? password;
 try {
   const filter = encodeURIComponent(`email='${panelEmail}'`);
   const existingUser = await request(`/api/collections/users/records?filter=${filter}`, { headers: authHeaders });
-  if (!existingUser.items?.length) {
+  if (existingUser.items?.length) {
+    await request(`/api/collections/users/records/${existingUser.items[0].id}`, {
+      method: "PATCH",
+      headers: authHeaders,
+      body: JSON.stringify({ email: panelEmail, password: panelPassword, passwordConfirm: panelPassword, verified: true })
+    });
+    console.log(`updated panel user ${panelEmail}`);
+  } else {
     await request("/api/collections/users/records", {
       method: "POST",
       headers: authHeaders,
