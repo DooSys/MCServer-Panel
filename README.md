@@ -2,7 +2,7 @@
 
 MCServer Panel est une interface web moderne pour administrer un serveur Minecraft Java existant base sur `itzg/minecraft-server`. Le panel tourne dans son propre conteneur, communique avec Minecraft via RCON, lit/ecrit de facon controlee dans le volume `/mc-data`, et embarque PocketBase pour les comptes, les preferences et l'audit applicatif.
 
-Version actuelle : `1.1.1`.
+Version actuelle : `1.1.2`.
 
 ## Objectif du projet
 
@@ -62,7 +62,7 @@ Le Dockerfile est multi-stage :
 Build local manuel :
 
 ```bash
-docker build --build-arg APP_VERSION=1.1.1 -t ghcr.io/doosys/mcserver-panel:1.1.1 .
+docker build --build-arg APP_VERSION=1.1.2 -t ghcr.io/doosys/mcserver-panel:1.1.2 .
 ```
 
 Test local rapide apres build :
@@ -73,7 +73,7 @@ docker run --rm -p 8088:8080 \
   -e MC_RCON_PASSWORD=dev \
   -v "$PWD/.tmp/mc-data:/mc-data" \
   -v "$PWD/.tmp/pb_data:/app/pb_data" \
-  ghcr.io/doosys/mcserver-panel:1.1.1
+  ghcr.io/doosys/mcserver-panel:1.1.2
 ```
 
 ## Publication GitHub
@@ -83,7 +83,7 @@ Le workflow `.github/workflows/docker-image.yml` publie l'image sur GitHub Conta
 Tags produits :
 
 - `ghcr.io/doosys/mcserver-panel:latest` sur `main` ;
-- `ghcr.io/doosys/mcserver-panel:1.1.1` avec un tag Git `v1.1.1` ;
+- `ghcr.io/doosys/mcserver-panel:1.1.2` avec un tag Git `v1.1.2` ;
 - `ghcr.io/doosys/mcserver-panel:1.1` ;
 - tag court base sur le SHA.
 
@@ -92,45 +92,47 @@ Commandes de release typiques depuis WSL :
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.1"
+git commit -m "Release 1.1.2"
 git push origin main
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.2
+git push origin v1.1.2
 ```
 
 GitHub Actions doit avoir le droit `packages: write`, deja defini dans le workflow. Si l'image GHCR est privee, le Synology devra faire un `docker login ghcr.io` avec un token GitHub ayant le droit `read:packages`.
 
 ## Deploiement Synology
 
-Copier l'exemple :
+Le compose fourni lance uniquement `MCServer-panel`. Il ne contient pas le service `itzg/minecraft-server`, afin de pouvoir mettre a jour le panel sans redemarrer le serveur de jeu.
+
+Preparation sur le NAS :
 
 ```bash
+mkdir -p /volume1/docker/MCServer-panel/pb_data
+cd /volume1/docker/MCServer-panel
 cp docker-compose.example.yml docker-compose.yml
+cp .env.example .env
 ```
 
-Adapter au minimum :
+Modifier `.env` :
 
-- `RCON_PASSWORD` et `MC_RCON_PASSWORD` avec la meme valeur ;
-- `PB_SUPERUSER_EMAIL` ;
-- `PB_SUPERUSER_PASSWORD` ;
-- `PANEL_ADMIN_EMAIL` ;
-- `PANEL_ADMIN_PASSWORD` ;
-- les chemins `/volume1/docker/...` ;
-- `MC_SERVER_FLAVOR` et `MC_VERSION` selon le serveur.
+- `MC_RCON_PASSWORD` avec le vrai mot de passe RCON du serveur existant ;
+- `MC_WORLD_PATH` avec le dossier monde existant ;
+- `PANEL_PB_DATA_PATH` avec le dossier persistant PocketBase ;
+- `PB_SUPERUSER_*` et `PANEL_ADMIN_*` avec des secrets forts.
 
-Deploiement SSH sur Synology :
+Si le conteneur Minecraft existant s'appelle `minecraft`, raccorder le panel et Minecraft a un reseau commun une seule fois :
+
+```bash
+docker network create MCServer-panel-net
+docker network connect MCServer-panel-net minecraft
+```
+
+Puis deployer ou mettre a jour seulement le panel :
 
 ```bash
 cd /volume1/docker/MCServer-panel
 docker compose pull MCServer-panel
 docker compose up -d MCServer-panel
-```
-
-Pour recreer tout l'ensemble Minecraft + panel :
-
-```bash
-docker compose pull
-docker compose up -d
 ```
 
 URL panel :
@@ -158,13 +160,13 @@ http://IP_DU_SERVEUR:8088/pb/_/
 | `MC_DOCKER_IMAGE` | `itzg/minecraft-server` | Image Docker affichee dans le dashboard |
 | `MC_DOCKER_TAG` | vide | Tag image affiche dans le dashboard |
 | `ENABLE_IMAGE_UPDATE_CHECK` | `false` | Reserve a une future integration registry/Docker socket |
-| `APP_VERSION` | `1.1.1` | Version affichee pour MCServer-Panel |
+| `APP_VERSION` | `1.1.2` | Version affichee pour MCServer-Panel |
 | `APP_DOCKER_IMAGE` | `ghcr.io/doosys/mcserver-panel` | Image du panel affichee dans le header |
 | `APP_DOCKER_TAG` | `latest` | Tag de l'image du panel |
 | `PANEL_UPDATE_STATUS` | `not_checked` | Badge header: `not_checked`, `current`, `update_available` ou `unknown` |
 | `ENABLE_CATALOG` | `false` dans compose | Active la recherche externe Modrinth |
 | `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l'installation depuis le catalogue vers `/mc-data` |
-| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.1` | User-Agent envoye aux APIs externes |
+| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.2` | User-Agent envoye aux APIs externes |
 | `APP_PORT` | `8080` | Port interne du panel |
 | `POCKETBASE_DATA` | `/app/pb_data` | Donnees PocketBase persistantes |
 | `POCKETBASE_URL` | `http://127.0.0.1:8090` | URL interne PocketBase |

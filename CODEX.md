@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.1`.
+- App version starts at `1.1.2`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -48,6 +48,8 @@ Then update Docker/docs references to the same version.
 - Push to `main` publishes `latest`.
 - Git tag `vX.Y.Z` publishes semver tags.
 - Synology compose should consume `ghcr.io/doosys/mcserver-panel:latest` during active testing.
+- `docker-compose.example.yml` is panel-only; it must not define or manage the `itzg/minecraft-server` service during Synology validation.
+- The existing Minecraft container should be attached once to `MCServer-panel-net` with `docker network connect MCServer-panel-net minecraft`, avoiding a game server reboot.
 - If GHCR package is private, Synology needs `docker login ghcr.io` with a GitHub token that can `read:packages`.
 
 Release commands from WSL:
@@ -55,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.1"
+git commit -m "Release 1.1.2"
 git push origin main
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.2
+git push origin v1.1.2
 ```
 
 ## Validation Commands

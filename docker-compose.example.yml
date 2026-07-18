@@ -1,51 +1,26 @@
 services:
-  minecraft:
-    image: itzg/minecraft-server:latest
-    container_name: minecraft
-    restart: unless-stopped
-    ports:
-      - "25565:25565"
-    environment:
-      EULA: "TRUE"
-      TYPE: "VANILLA"
-      VERSION: "1.21.5"
-      ENABLE_RCON: "true"
-      RCON_PASSWORD: "change-this-rcon-password"
-    volumes:
-      - /volume1/docker/minecraft/data/world-1-21:/data
-
   MCServer-panel:
-    image: ghcr.io/doosys/mcserver-panel:latest
+    image: ghcr.io/doosys/mcserver-panel:${APP_DOCKER_TAG}
     container_name: MCServer-panel
     restart: unless-stopped
-    depends_on:
-      - minecraft
-    environment:
-      MC_RCON_HOST: "minecraft"
-      MC_RCON_PORT: "25575"
-      MC_RCON_PASSWORD: "change-this-rcon-password"
-      MC_DATA_PATH: "/mc-data"
-      MC_SERVER_FLAVOR: "Vanilla"
-      MC_VERSION: "1.21.5"
-      MC_DOCKER_IMAGE: "itzg/minecraft-server"
-      MC_DOCKER_TAG: "latest"
-      ENABLE_IMAGE_UPDATE_CHECK: "false"
-      APP_VERSION: "1.1.1"
-      APP_DOCKER_IMAGE: "ghcr.io/doosys/mcserver-panel"
-      APP_DOCKER_TAG: "latest"
-      PANEL_UPDATE_STATUS: "not_checked"
-      ENABLE_CATALOG: "false"
-      ENABLE_CATALOG_INSTALL: "false"
-      APP_PORT: "8080"
-      POCKETBASE_DATA: "/app/pb_data"
-      REQUIRE_AUTH: "true"
-      PB_SUPERUSER_EMAIL: "admin@example.local"
-      PB_SUPERUSER_PASSWORD: "change-this-admin-password"
-      PANEL_ADMIN_EMAIL: "admin@example.local"
-      PANEL_ADMIN_PASSWORD: "change-this-panel-password"
-      TZ: "Europe/Paris"
+    env_file:
+      - .env
     volumes:
-      - /volume1/docker/minecraft/data/world-1-21:/mc-data
-      - /volume1/docker/MCServer-panel/pb_data:/app/pb_data
+      # Dossier monde existant du serveur Minecraft, monte dans le panel uniquement.
+      # Ce compose ne gere pas le conteneur Minecraft et ne le redemarre pas.
+      - ${MC_WORLD_PATH}:/mc-data
+      - ${PANEL_PB_DATA_PATH}:/app/pb_data
     ports:
       - "8088:8080"
+    networks:
+      - minecraft-access
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  minecraft-access:
+    external: true
+    name: ${MC_DOCKER_NETWORK}

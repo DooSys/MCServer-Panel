@@ -28,7 +28,7 @@ ghcr.io/doosys/mcserver-panel:latest
 Image versionnee :
 
 ```text
-ghcr.io/doosys/mcserver-panel:1.1.1
+ghcr.io/doosys/mcserver-panel:1.1.2
 ```
 
 Si le package GHCR est prive :
@@ -41,22 +41,32 @@ Utiliser un token GitHub avec `read:packages`.
 
 ## Compose
 
-Partir de `docker-compose.example.yml`, remplacer les secrets, puis copier le fichier sur le NAS dans le dossier choisi.
+Le compose de ce projet ne gere que `MCServer-panel`. Le serveur Minecraft existant reste dans son conteneur actuel et ne sera pas redemarre par les commandes du panel.
 
-Deploiement du panel uniquement :
+Preparer le dossier du panel :
+
+```bash
+mkdir -p /volume1/docker/MCServer-panel/pb_data
+cd /volume1/docker/MCServer-panel
+cp docker-compose.example.yml docker-compose.yml
+cp .env.example .env
+```
+
+Modifier `.env` avec le vrai mot de passe RCON et les chemins Synology.
+
+Le panel doit joindre le conteneur Minecraft via un reseau Docker commun. Une fois seulement, sans reboot du serveur Minecraft :
+
+```bash
+docker network create MCServer-panel-net
+docker network connect MCServer-panel-net minecraft
+```
+
+Deploiement ou mise a jour du panel uniquement :
 
 ```bash
 cd /volume1/docker/MCServer-panel
 docker compose pull MCServer-panel
 docker compose up -d MCServer-panel
-```
-
-Deploiement complet Minecraft + panel :
-
-```bash
-cd /volume1/docker/MCServer-panel
-docker compose pull
-docker compose up -d
 ```
 
 Suivi des logs :
