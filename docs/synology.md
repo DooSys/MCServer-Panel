@@ -28,7 +28,7 @@ ghcr.io/doosys/mcserver-panel:latest
 Image versionnee :
 
 ```text
-ghcr.io/doosys/mcserver-panel:1.1.10
+ghcr.io/doosys/mcserver-panel:1.1.11
 ```
 
 Si le package GHCR est prive :
@@ -158,3 +158,5 @@ La page Logs peut lire les logs du conteneur Minecraft et du conteneur MCServer-
     PANEL_CONTAINER_NAME=MCServer-panel
 
 Sans ce montage, la source Minecraft latest.log reste disponible via le volume /mc-data, mais les sources docker logs afficheront une erreur Docker API indisponible.
+
+Note auth navigateur : depuis 1.1.11, le panel et PocketBase admin utilisent deux stockages separes. Si une ancienne session reste bloquee, ouvrir d abord le panel une fois nettoie automatiquement l ancienne session panel stockee dans PocketBase admin.

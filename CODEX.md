@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.10`.
+- App version starts at `1.1.11`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.10 --no-git-tag-version
+npm version 1.1.11 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.10"
+git commit -m "Release 1.1.11"
 git push origin main
-git tag v1.1.10
-git push origin v1.1.10
+git tag v1.1.11
+git push origin v1.1.11
 ```
 
 ## Validation Commands
@@ -144,14 +144,21 @@ Notes:
 
 ## Logs Integration
 
-- Version 1.1.10 adds /api/logs/sources and /api/logs/:source.
+- Version 1.1.11 adds /api/logs/sources and /api/logs/:source.
 - Sources are minecraft-container, panel-container, and minecraft-latest.
 - Docker container logs use the Docker Engine API over DOCKER_SOCKET_PATH; Synology compose mounts /var/run/docker.sock read-only.
 - UI supports source selection, filter, live refresh, tail size, and auto-scroll pause.
 
 ## PocketBase Admin Proxy
 
-- Version 1.1.10 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
+- Version 1.1.11 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
 - Root PocketBase API prefixes /api/collections, /api/files, /api/realtime, and /api/batch are proxied before MCServer-panel API auth middleware.
 - The old /pb proxy remains for the app PocketBase client, but UI links should point to /_/ for PocketBase admin.
 - Frontend apiFetch clears stale PocketBase tokens on 401 auth/session/token errors, which avoids repeated Invalid PocketBase session toasts after a container restart or password rotation.
+
+## PocketBase Auth Regression Notes
+
+- Version 1.1.11 separates browser auth storage: MCServer-panel uses `mcserver_panel_auth`; PocketBase admin keeps the default `pocketbase_auth`.
+- The client removes legacy non-superuser `pocketbase_auth` values left by earlier panel builds, preventing the PocketBase admin UI from opening with a panel user token.
+- Backend `requireAuth` forwards refreshed PocketBase tokens in `x-pocketbase-token` and `x-pocketbase-record`; the frontend saves them after API calls.
+- This avoids immediate logout after `auth-refresh` and avoids repeated `Invalid PocketBase session` messages caused by stale rotated tokens.

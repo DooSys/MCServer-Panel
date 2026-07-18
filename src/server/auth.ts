@@ -10,14 +10,27 @@ declare global {
   }
 }
 
+type PocketBaseAuthPayload = {
+  token?: string;
+  record?: { id?: string; collectionName?: string };
+};
+
 async function refreshPocketBaseAuth(token: string, collection: "users" | "_superusers") {
-  const pbResponse = await fetch(`${config.pocketBaseUrl}/api/collections/${collection}/auth-refresh`, {
+  const pbResponse = await fetch(config.pocketBaseUrl + "/api/collections/" + collection + "/auth-refresh", {
     method: "POST",
-    headers: { authorization: `Bearer ${token}` }
+    headers: { authorization: "Bearer " + token }
   });
 
   if (!pbResponse.ok) return null;
-  return pbResponse.json() as Promise<{ record?: { id?: string } }>;
+  return pbResponse.json() as Promise<PocketBaseAuthPayload>;
+}
+
+function attachRefreshedAuth(response: Response, payload: PocketBaseAuthPayload) {
+  if (!payload.token) return;
+  response.setHeader("x-pocketbase-token", payload.token);
+  if (payload.record) {
+    response.setHeader("x-pocketbase-record", encodeURIComponent(JSON.stringify(payload.record)));
+  }
 }
 
 export async function requireAuth(request: Request, response: Response, next: NextFunction) {
@@ -38,6 +51,7 @@ export async function requireAuth(request: Request, response: Response, next: Ne
   try {
     const userPayload = await refreshPocketBaseAuth(token, "users");
     if (userPayload) {
+      attachRefreshedAuth(response, userPayload);
       request.userId = userPayload.record?.id;
       request.authCollection = "users";
       next();
@@ -46,6 +60,7 @@ export async function requireAuth(request: Request, response: Response, next: Ne
 
     const superuserPayload = await refreshPocketBaseAuth(token, "_superusers");
     if (superuserPayload) {
+      attachRefreshedAuth(response, superuserPayload);
       request.userId = superuserPayload.record?.id;
       request.authCollection = "_superusers";
       next();
