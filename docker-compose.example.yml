@@ -1,6 +1,6 @@
 services:
   MCServer-panel:
-    image: ghcr.io/doosys/mcserver-panel:${APP_DOCKER_TAG}
+    image: ghcr.io/doosys/mcserver-panel:${PANEL_IMAGE_TAG:-1.1.17}
     container_name: MCServer-panel
     restart: unless-stopped
     env_file:

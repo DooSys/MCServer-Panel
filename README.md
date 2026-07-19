@@ -2,7 +2,7 @@
 
 MCServer-panel est une interface web moderne pour administrer un serveur Minecraft Java existant base sur `itzg/minecraft-server`. Le panel tourne dans son propre conteneur, communique avec Minecraft via RCON, lit/ecrit de facon controlee dans le volume `/mc-data`, et embarque PocketBase pour les comptes, les preferences et l'audit applicatif.
 
-Version actuelle : `1.1.16`.
+Version actuelle : `1.1.17`.
 
 ## Objectif du projet
 
@@ -62,7 +62,7 @@ Le Dockerfile est multi-stage :
 Build local manuel :
 
 ```bash
-docker build --build-arg APP_VERSION=1.1.16 -t ghcr.io/doosys/mcserver-panel:1.1.16 .
+docker build --build-arg APP_VERSION=1.1.17 -t ghcr.io/doosys/mcserver-panel:1.1.17 .
 ```
 
 Test local rapide apres build :
@@ -73,7 +73,7 @@ docker run --rm -p 8088:8080 \
   -e RCON_PASSWORD=dev \
   -v "$PWD/.tmp/mc-data:/mc-data" \
   -v "$PWD/.tmp/pb_data:/app/pb_data" \
-  ghcr.io/doosys/mcserver-panel:1.1.16
+  ghcr.io/doosys/mcserver-panel:1.1.17
 ```
 
 ## Publication GitHub
@@ -83,7 +83,7 @@ Le workflow `.github/workflows/docker-image.yml` publie l'image sur GitHub Conta
 Tags produits :
 
 - `ghcr.io/doosys/mcserver-panel:latest` sur `main` ;
-- `ghcr.io/doosys/mcserver-panel:1.1.16` avec un tag Git `v1.1.16` ;
+- `ghcr.io/doosys/mcserver-panel:1.1.17` avec un tag Git `v1.1.17` ;
 - `ghcr.io/doosys/mcserver-panel:1.1` ;
 - tag court base sur le SHA.
 
@@ -92,10 +92,10 @@ Commandes de release typiques depuis WSL :
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.16"
+git commit -m "Release 1.1.17"
 git push origin main
-git tag v1.1.16
-git push origin v1.1.16
+git tag v1.1.17
+git push origin v1.1.17
 ```
 
 GitHub Actions doit avoir le droit `packages: write`, deja defini dans le workflow. Si l'image GHCR est privee, le Synology devra faire un `docker login ghcr.io` avec un token GitHub ayant le droit `read:packages`.
@@ -159,18 +159,10 @@ http://IP_DU_SERVEUR:8088/_/
 | `PANEL_DATA_PATH` | `/volume1/docker/MCServer-panel/data` | Donnees persistantes du panel et de PocketBase |
 | `MC_DOCKER_NETWORK` | `minecraft_default` | Reseau Docker externe commun avec Minecraft |
 | `MC_DATA_PATH` | `/mc-data` | Chemin interne du volume Minecraft dans le panel |
-| `MC_SERVER_FLAVOR` | vide | Force le runtime affiche si les logs ne suffisent pas |
-| `MC_VERSION` | vide | Version Minecraft affichee et fallback tag image |
-| `MC_DOCKER_IMAGE` | `itzg/minecraft-server` | Image Docker affichee dans le dashboard |
-| `MC_DOCKER_TAG` | vide | Tag image affiche dans le dashboard |
-| `ENABLE_IMAGE_UPDATE_CHECK` | `false` | Reserve a une future integration registry/Docker socket |
-| `APP_VERSION` | `1.1.16` | Version affichee pour MCServer-Panel |
-| `APP_DOCKER_IMAGE` | `ghcr.io/doosys/mcserver-panel` | Image du panel affichee dans le header |
-| `APP_DOCKER_TAG` | `1.1.16` | Tag de l'image du panel pour validation Synology |
-| `PANEL_UPDATE_STATUS` | `not_checked` | Badge header: `not_checked`, `current`, `update_available` ou `unknown` |
-| `ENABLE_CATALOG` | `true` dans l exemple | Active la recherche externe Modrinth |
-| `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l'installation depuis le catalogue vers `/mc-data` |
-| `CATALOG_USER_AGENT` | `MCServer-Panel/1.1.16` | User-Agent envoye aux APIs externes |
+| `PANEL_IMAGE_TAG` | `1.1.17` | Tag de l image MCServer-panel utilise par le compose Synology |
+| `MINECRAFT_UPDATE_CHECK` | `true` | Verifie si la version Minecraft/Paper detectee est a jour |
+| `CATALOG_DISABLED` | `false` | Coupe la recherche externe Modrinth si defini a `true` |
+| `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l installation depuis le catalogue vers `/mc-data` |
 | `APP_PORT` | `8080` | Port interne du panel |
 | `POCKETBASE_DATA` | `/app/pb_data` | Donnees PocketBase persistantes |
 | `POCKETBASE_URL` | `http://127.0.0.1:8090` | URL interne PocketBase |
@@ -230,7 +222,7 @@ Pour les deux sources Docker, le socket Docker doit etre monte en lecture seule 
 
 Variables associees : MC_CONTAINER_NAME, PANEL_CONTAINER_NAME, DOCKER_SOCKET_PATH et LOG_TAIL_LINES.
 
-Note auth navigateur : depuis 1.1.16, le panel et PocketBase admin utilisent deux stockages separes. Si une ancienne session reste bloquee, ouvrir d abord le panel une fois nettoie automatiquement l ancienne session panel stockee dans PocketBase admin.
+Note auth navigateur : depuis 1.1.17, le panel et PocketBase admin utilisent deux stockages separes. Si une ancienne session reste bloquee, ouvrir d abord le panel une fois nettoie automatiquement l ancienne session panel stockee dans PocketBase admin.
 
 ## Routage API
 

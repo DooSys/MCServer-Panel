@@ -27,6 +27,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   headers.set("accept", "application/json");
   if (!(init.body instanceof FormData)) headers.set("content-type", "application/json");
+  const requestToken = pb.authStore.token;
   const auth = authHeader();
   if (auth.authorization) headers.set("authorization", auth.authorization);
 
@@ -45,12 +46,14 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
         record = pb.authStore.record;
       }
     }
-    pb.authStore.save(refreshedToken, record as never);
+    if (!requestToken || pb.authStore.token === requestToken) {
+      pb.authStore.save(refreshedToken, record as never);
+    }
   }
 
   if (!response.ok) {
     const message = data?.error ?? "HTTP " + response.status;
-    if (response.status === 401 && /auth|session|token/i.test(message)) {
+    if (response.status === 401 && /auth|session|token/i.test(message) && pb.authStore.token === requestToken) {
       pb.authStore.clear();
     }
     throw new Error(message);

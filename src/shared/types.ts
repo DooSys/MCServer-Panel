@@ -19,6 +19,11 @@ export type ServerStatus = {
     message: string;
     checkedAt?: string;
   };
+  minecraftUpdate?: {
+    status: "not_configured" | "not_checked" | "unknown" | "current" | "update_available";
+    message: string;
+    checkedAt?: string;
+  };
   panelVersion?: string;
   panelImage?: string;
   panelImageTag?: string;

@@ -8,7 +8,7 @@ import { auditLog } from "./audit.js";
 import { getCatalogVersions, installCatalogPackage, searchCatalog } from "./catalog.js";
 import { config } from "./config.js";
 import { minecraftGameruleAliases, parseGameruleValue } from "./gameruleMapper.js";
-import { readDockerContainerLogs } from "./dockerLogs.js";
+import { inspectDockerContainer, readDockerContainerLogs } from "./dockerLogs.js";
 import { detectLogEvents, latestLog, listDatapacks, readJsonFile, readServerProperties, readTextFile } from "./minecraftFiles.js";
 import { inspectPackage } from "./packageInspector.js";
 import { ensureMcDir, publicMcPath, withinMcData } from "./paths.js";
@@ -25,10 +25,7 @@ const upload = multer({
 });
 
 
-function detectServerFlavor(logContent: string, props: Record<string, string>) {
-  const configured = config.mcServerFlavor.trim();
-  if (configured) return configured;
-
+function detectServerFlavor(logContent: string, props: Record<string, string>, dockerEnv: Record<string, string> = {}) {
   const lower = logContent.toLowerCase();
   if (lower.includes('purpur')) return 'Purpur';
   if (lower.includes('paper')) return 'Paper';
@@ -36,16 +33,21 @@ function detectServerFlavor(logContent: string, props: Record<string, string>) {
   if (lower.includes('bukkit')) return 'Bukkit';
   if (lower.includes('fabric')) return 'Fabric';
   if (lower.includes('forge')) return 'Forge';
+
+  const dockerType = String(dockerEnv.TYPE ?? '').trim();
+  if (dockerType) return dockerType.charAt(0).toUpperCase() + dockerType.slice(1).toLowerCase();
+
   if (props['level-type'] || props.gamemode || logContent) return 'Vanilla';
   return 'Unknown';
 }
 
-function detectMinecraftVersion(logContent: string, props: Record<string, string>) {
-  if (config.mcVersion) return config.mcVersion;
+function detectMinecraftVersion(logContent: string, props: Record<string, string>, dockerEnv: Record<string, string> = {}) {
   const versionMatch = logContent.match(new RegExp('Starting minecraft server version\\s+([^\\r\\n]+)', 'i'));
   if (versionMatch) return versionMatch[1].trim();
   const paperMatch = logContent.match(new RegExp('Minecraft\\s+version\\s+([^\\r\\n]+)', 'i'));
   if (paperMatch) return paperMatch[1].trim();
+  const dockerVersion = String(dockerEnv.VERSION ?? '').trim();
+  if (dockerVersion) return dockerVersion;
   return props.version || 'Unknown';
 }
 
@@ -57,20 +59,50 @@ function normalizeUpdateStatus(value: string, fallbackMessage: string) {
   return { status: 'not_checked' as const, message: fallbackMessage };
 }
 
-function imageUpdateStatus(tag: string) {
-  if (!config.mcDockerImage && !tag) {
-    return { status: 'not_configured' as const, message: 'Docker image not configured' };
+
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 3500): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal, headers: { accept: "application/json", "user-agent": config.catalogUserAgent } });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
   }
-  if (!tag) {
-    return { status: 'not_checked' as const, message: 'Image tag not provided to the panel' };
+}
+
+async function minecraftUpdateStatus(serverFlavor: string, minecraftVersion: string) {
+  const current = minecraftVersion && minecraftVersion !== "Unknown" ? minecraftVersion : "";
+  if (!config.enableMinecraftUpdateCheck) {
+    return { status: "not_checked" as const, message: "Verification desactivee" };
   }
-  if (!config.enableImageUpdateCheck) {
-    return { status: 'not_checked' as const, message: 'Update check disabled; no Docker socket access in MVP' };
+  if (!current) {
+    return { status: "not_configured" as const, message: "Version Minecraft non detectee" };
   }
-  if (tag === 'latest') {
-    return { status: 'unknown' as const, message: 'latest cannot be compared without the local image digest' };
+
+  const flavor = serverFlavor.toLowerCase();
+  try {
+    if (flavor.includes("paper")) {
+      const data = await fetchJsonWithTimeout<{ versions: string[] }>("https://api.papermc.io/v2/projects/paper");
+      const latest = data.versions.at(-1);
+      return latest === current
+        ? { status: "current" as const, message: "Paper a jour (" + latest + ")", checkedAt: new Date().toISOString() }
+        : { status: "update_available" as const, message: "Paper " + latest + " disponible", checkedAt: new Date().toISOString() };
+    }
+
+    if (flavor.includes("vanilla") || flavor === "unknown") {
+      const data = await fetchJsonWithTimeout<{ latest: { release: string } }>("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+      const latest = data.latest.release;
+      return latest === current
+        ? { status: "current" as const, message: "Minecraft a jour (" + latest + ")", checkedAt: new Date().toISOString() }
+        : { status: "update_available" as const, message: "Minecraft " + latest + " disponible", checkedAt: new Date().toISOString() };
+    }
+
+    return { status: "unknown" as const, message: "Verification non disponible pour " + serverFlavor };
+  } catch (error) {
+    return { status: "unknown" as const, message: "Verification impossible: " + (error instanceof Error ? error.message : "erreur reseau"), checkedAt: new Date().toISOString() };
   }
-  return { status: 'unknown' as const, message: 'Registry comparison is reserved for a later Docker integration', checkedAt: new Date().toISOString() };
 }
 
 function asyncRoute(handler: express.RequestHandler): express.RequestHandler {
@@ -157,18 +189,25 @@ async function writeGameruleValue(key: string, value: string) {
 async function statusPayload(): Promise<ServerStatus> {
   const props = await readServerProperties();
   const logContent = await latestLog().catch(() => '');
-  const dockerImageTag = config.mcDockerTag || 'unknown';
+  const minecraftContainer = await inspectDockerContainer(config.mcContainerName);
+  const dockerImage = minecraftContainer.image ?? "unknown";
+  const dockerImageParts = dockerImage.split(":");
+  const dockerImageTag = dockerImageParts.length > 1 ? dockerImageParts.at(-1) ?? "unknown" : "unknown";
+  const minecraftVersion = detectMinecraftVersion(logContent, props, minecraftContainer.env);
+  const serverFlavor = detectServerFlavor(logContent, props, minecraftContainer.env);
+  const minecraftUpdate = await minecraftUpdateStatus(serverFlavor, minecraftVersion);
   const base = {
     rconHost: config.rconHost,
     rconPort: config.rconPort,
     motd: props.motd,
     version: props.version,
-    minecraftVersion: detectMinecraftVersion(logContent, props),
-    type: "itzg/java",
-    serverFlavor: detectServerFlavor(logContent, props),
-    dockerImage: config.mcDockerImage,
+    minecraftVersion,
+    type: minecraftContainer.env.TYPE ? "itzg/" + minecraftContainer.env.TYPE.toLowerCase() : "itzg/java",
+    serverFlavor,
+    dockerImage: dockerImageParts[0] || dockerImage,
     dockerImageTag,
-    imageUpdate: imageUpdateStatus(dockerImageTag),
+    imageUpdate: minecraftUpdate,
+    minecraftUpdate,
     panelVersion: config.appVersion,
     panelImage: config.appDockerImage,
     panelImageTag: config.appDockerTag,

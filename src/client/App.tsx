@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, PackageSearch, Pause, Play, RefreshCw, Save, Search, Sun, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
+import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, Moon, PackageSearch, Pause, Play, RefreshCw, Save, Search, Sun, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
 import { apiFetch, loginWithPassword, pb, postJson } from './api';
 import { localizeRule, normalizeLanguage, profileLabel, t } from './i18n';
 import type { Language, TranslationKey } from './i18n';
@@ -8,7 +8,8 @@ import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProject
 import { RECOMMENDED_PROFILES } from '../shared/gamerules';
 
 type Page = 'dashboard' | 'console' | 'players' | 'gamerules' | 'addons' | 'catalog' | 'files' | 'logs' | 'settings' | 'users';
-type Toast = { type: 'ok' | 'error'; message: string } | null;
+type Toast = { type: "ok" | "error"; message: string } | null;
+type Theme = "light" | "dark";
 type PageProps = { status: ServerStatus | null; setToast: (toast: Toast) => void; refreshStatus: () => Promise<void>; language: Language };
 
 const brandIcon = '/assets/mcserver-panel-icon.jpg';
@@ -26,24 +27,24 @@ function defaultLogFilters() {
   return Object.fromEntries(logFilterTypes.map((type) => [type, true])) as Record<LogFilterType, boolean>;
 }
 
-function classifyLogLine(line: string): LogFilterType[] {
+function logLineType(line: string): LogFilterType {
   const lower = line.toLowerCase();
-  const types: LogFilterType[] = [];
-  if (lower.includes('error')) types.push('error');
-  if (lower.includes('warn')) types.push('warn');
-  if (lower.includes('rcon')) types.push('rcon');
-  if (lower.includes('info')) types.push('info');
-  if (lower.includes('crash')) types.push('crash');
-  if (lower.includes('joined the game')) types.push('join');
-  if (lower.includes('not white-listed')) types.push('whitelist');
-  if (lower.includes('datapack')) types.push('datapack');
-  if (lower.includes('saved the game') || lower.includes('saved the world')) types.push('save');
-  return types.length ? types : ['other'];
+  if (lower.includes("error")) return "error";
+  if (lower.includes("warn")) return "warn";
+  if (lower.includes("rcon")) return "rcon";
+  if (lower.includes("crash")) return "crash";
+  if (lower.includes("joined the game")) return "join";
+  if (lower.includes("not white-listed") || lower.includes("whitelist")) return "whitelist";
+  if (lower.includes("datapack")) return "datapack";
+  if (lower.includes("saved the game") || lower.includes("saved the world")) return "save";
+  if (lower.includes("info")) return "info";
+  return "other";
 }
 
 
 export function App() {
-  const [language, setLanguageState] = useState<Language>(() => normalizeLanguage(localStorage.getItem('mc-panel-language')));
+  const [language, setLanguageState] = useState<Language>(() => normalizeLanguage(localStorage.getItem("mc-panel-language")));
+  const [theme, setTheme] = useState<Theme>(() => localStorage.getItem("mc-panel-theme") === "dark" ? "dark" : "light");
   const [page, setPage] = useState<Page>('dashboard');
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -51,10 +52,12 @@ export function App() {
   const [authRequired, setAuthRequired] = useState(true);
   const [loggedIn, setLoggedIn] = useState(pb.authStore.isValid);
 
-  function setLanguage(next: Language) { setLanguageState(next); localStorage.setItem('mc-panel-language', next); }
+  function setLanguage(next: Language) { setLanguageState(next); localStorage.setItem("mc-panel-language", next); }
+  function toggleTheme() { setTheme((current) => current === "dark" ? "light" : "dark"); }
   async function refreshStatus() { setStatus(await apiFetch<ServerStatus>('/server/status')); }
 
-  useEffect(() => { apiFetch<{ authRequired: boolean }>('/app/config').then((config) => setAuthRequired(config.authRequired)).finally(() => setAuthReady(true)); }, []);
+  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("mc-panel-theme", theme); }, [theme]);
+  useEffect(() => { apiFetch<{ authRequired: boolean }>("/app/config").then((config) => setAuthRequired(config.authRequired)).finally(() => setAuthReady(true)); }, []);
   useEffect(() => pb.authStore.onChange(() => setLoggedIn(pb.authStore.isValid), true), []);
   useEffect(() => { if (!authReady || (authRequired && !loggedIn)) return; refreshStatus().catch((error) => setToast({ type: 'error', message: error.message })); const timer = window.setInterval(() => refreshStatus().catch(() => undefined), 15000); return () => window.clearInterval(timer); }, [authReady, authRequired, loggedIn]);
 
@@ -63,7 +66,7 @@ export function App() {
 
   const Current = { dashboard: Dashboard, console: ConsolePage, players: PlayersPage, gamerules: GamerulesPage, addons: AddonsPage, catalog: CatalogPage, files: FilesPage, logs: LogsPage, settings: SettingsPage, users: UsersPage }[page];
 
-  return <div className="app-shell"><aside className="sidebar"><div className="brand"><img className="brand-mark" src={brandIcon} alt="" /><span>MCServer-panel</span></div><nav>{nav.map((item) => { const Icon = item.icon; return <button className={page === item.key ? 'active' : ''} key={item.key} onClick={() => setPage(item.key)}><Icon size={18} /><span>{t(language, item.label)}</span></button>; })}</nav><button className="ghost bottom" onClick={() => { pb.authStore.clear(); setLoggedIn(false); }}><LogOut size={18} /><span>{t(language, 'logout')}</span></button></aside><main><TopBar status={status} onRefresh={refreshStatus} language={language} setLanguage={setLanguage} />{toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}<Current status={status} setToast={setToast} refreshStatus={refreshStatus} language={language} /></main></div>;
+  return <div className="app-shell"><aside className="sidebar"><div className="brand"><img className="brand-mark" src={brandIcon} alt="" /><span>MCServer-panel</span></div><nav>{nav.map((item) => { const Icon = item.icon; return <button className={page === item.key ? 'active' : ''} key={item.key} onClick={() => setPage(item.key)}><Icon size={18} /><span>{t(language, item.label)}</span></button>; })}</nav><button className="ghost bottom" onClick={() => { pb.authStore.clear(); setLoggedIn(false); }}><LogOut size={18} /><span>{t(language, 'logout')}</span></button></aside><main><TopBar status={status} onRefresh={refreshStatus} language={language} setLanguage={setLanguage} theme={theme} toggleTheme={toggleTheme} />{toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}<Current status={status} setToast={setToast} refreshStatus={refreshStatus} language={language} /></main></div>;
 }
 
 function LanguageSwitch({ language, setLanguage }: { language: Language; setLanguage: (language: Language) => void }) {
@@ -89,8 +92,10 @@ function updateBadgeClass(status?: ServerStatus['panelUpdate']) {
   return 'pill';
 }
 
-function TopBar({ status, onRefresh, language, setLanguage }: { status: ServerStatus | null; onRefresh: () => Promise<void>; language: Language; setLanguage: (language: Language) => void }) {
-  return <header className="topbar"><div><p className="eyebrow">{t(language, 'serverRuntime')}</p><h1>{status?.motd || 'Minecraft'}</h1></div><div className="status-strip"><LanguageSwitch language={language} setLanguage={setLanguage} /><a className="header-link" href="/_/" target="_blank">{t(language, 'pbAdmin')}</a><span className={status?.rconOk ? 'pill ok' : 'pill down'} title={`${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575} ${status?.rconError ?? status?.error ?? ''}`}>{status?.rconOk ? 'RCON OK' : `RCON off ${status?.rconHost ?? 'minecraft'}:${status?.rconPort ?? 25575}`}</span><span className={updateBadgeClass(status?.panelUpdate)}>{t(language, 'panelUpdate')}: {updateBadgeLabel(language, status?.panelUpdate)}</span><span className="pill">{status?.playersOnline ?? 0}/{status?.playersMax ?? '?'} {t(language, 'players')}</span><button className="icon-button" title={t(language, 'refresh')} onClick={() => onRefresh()}><RefreshCw size={18} /></button></div></header>;
+function TopBar({ status, onRefresh, language, setLanguage, theme, toggleTheme }: { status: ServerStatus | null; onRefresh: () => Promise<void>; language: Language; setLanguage: (language: Language) => void; theme: Theme; toggleTheme: () => void }) {
+  const ThemeIcon = theme === "dark" ? Sun : Moon;
+  const rconTarget = (status?.rconHost ?? "minecraft") + ":" + (status?.rconPort ?? 25575);
+  return <header className="topbar"><div><p className="eyebrow">{t(language, "serverRuntime")}</p><h1>{status?.motd || "Minecraft"}</h1></div><div className="status-strip"><LanguageSwitch language={language} setLanguage={setLanguage} /><button className="icon-button compact" title={theme === "dark" ? t(language, "themeLight") : t(language, "themeDark")} onClick={toggleTheme}><ThemeIcon size={17} /></button><a className="header-link" href="/_/" target="_blank">{t(language, "pbAdmin")}</a><span className={status?.rconOk ? "pill ok" : "pill down"} title={rconTarget + " " + (status?.rconError ?? status?.error ?? "")}>{status?.rconOk ? "RCON OK" : "RCON off " + rconTarget}</span><span className={updateBadgeClass(status?.panelUpdate)}>{t(language, "panelUpdate")}: {updateBadgeLabel(language, status?.panelUpdate)}</span><span className="pill">{status?.playersOnline ?? 0}/{status?.playersMax ?? "?"} {t(language, "players")}</span><button className="icon-button" title={t(language, "refresh")} onClick={() => onRefresh()}><RefreshCw size={18} /></button></div></header>;
 }
 
 function Dashboard({ status, setToast, refreshStatus, language }: PageProps) {
@@ -101,7 +106,7 @@ function Dashboard({ status, setToast, refreshStatus, language }: PageProps) {
     [t(language, 'minecraftVersion'), status?.minecraftVersion ?? t(language, 'unknown'), t(language, 'readFromServerProperties')],
     [t(language, 'navPlayers'), `${status?.playersOnline ?? 0}/${status?.playersMax ?? '?'}`, status?.players.join(', ') || t(language, 'noPlayers')],
     [t(language, 'world'), status?.gameMode ?? t(language, 'unknown'), `${t(language, 'difficulty')} ${status?.difficulty ?? '?'}`],
-    [t(language, 'dockerImage'), `${status?.dockerImage ?? 'itzg/minecraft-server'}:${status?.dockerImageTag ?? '?'}`, status?.imageUpdate?.message ?? t(language, 'updateStatus')]
+    [t(language, 'dockerImage'), `${status?.dockerImage ?? 'itzg/minecraft-server'}:${status?.dockerImageTag ?? '?'}`, status?.minecraftUpdate?.message ?? t(language, "updateStatus")]
   ];
   async function action(action: string, message?: string) { try { const data = await postJson<{ result: string }>('/server/quick-action', { action, message }); setToast({ type: 'ok', message: data.result || t(language, 'actionDone') }); await refreshStatus(); } catch (error) { setToast({ type: 'error', message: error instanceof Error ? error.message : t(language, 'error') }); } }
   return <section className="page-grid"><div className="metric-grid">{cards.map(([label, value, detail]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><section className="panel wide"><div className="panel-head"><h2>{t(language, 'quickActions')}</h2><span>{t(language, 'controlledRcon')}</span></div><div className="quick-actions"><button onClick={() => action('save_all')}><Save size={17} />{t(language, 'saveWorld')}</button><button onClick={() => action('time_day')}><Sun size={17} />{t(language, 'day')}</button><button onClick={() => action('weather_clear')}><CloudSun size={17} />{t(language, 'clearWeather')}</button></div><div className="inline-form"><input placeholder={t(language, 'serverMessage')} value={say} onChange={(event) => setSay(event.target.value)} /><button onClick={() => action('say', say)}><MessageSquare size={17} />{t(language, 'send')}</button></div></section></section>;
@@ -200,7 +205,6 @@ function LogsPage({ setToast, language }: PageProps) {
   const [sources, setSources] = useState<LogSource[]>([]);
   const [source, setSource] = useState<LogSourceId>("minecraft-container");
   const [content, setContent] = useState("");
-  const [detections, setDetections] = useState<LogPayload["detections"]>([]);
   const [query, setQuery] = useState("");
   const [tail, setTail] = useState(400);
   const [live, setLive] = useState(true);
@@ -216,7 +220,6 @@ function LogsPage({ setToast, language }: PageProps) {
     try {
       const data = await apiFetch<LogPayload>("/logs/" + source + "?tail=" + tail);
       setContent(data.content);
-      setDetections(data.detections);
       setLastUpdate(data.generatedAt);
       setError(data.error ?? "");
     } catch (err) {
@@ -240,16 +243,17 @@ function LogsPage({ setToast, language }: PageProps) {
 
   const filtered = useMemo(() => content.split(/\r?\n/).filter((line) => {
     if (line.toLowerCase().includes(query.toLowerCase()) === false) return false;
-    return classifyLogLine(line).some((type) => logFilters[type]);
+    return logFilters[logLineType(line)];
   }).join("\n"), [content, query, logFilters]);
   const selected = sources.find((item) => item.id === source);
+  const logCounts = useMemo(() => content.split(/\r?\n/).reduce((counts, line) => { if (!line) return counts; const type = logLineType(line); counts[type] += 1; return counts; }, Object.fromEntries(logFilterTypes.map((type) => [type, 0])) as Record<LogFilterType, number>), [content]);
   const allFiltersEnabled = logFilterTypes.every((type) => logFilters[type]);
 
   function toggleLogFilter(type: LogFilterType) {
     setLogFilters((current) => ({ ...current, [type]: current[type] === false }));
   }
 
-  return <section className="panel page-panel logs-panel"><div className="panel-head logs-head"><div><h2>{t(language, "navLogs")}</h2><span>{selected?.label ?? t(language, "logSource")} - {selected?.detail ?? source}</span></div><div className="logs-actions"><select value={source} onChange={(event) => setSource(event.target.value as LogSourceId)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select value={tail} onChange={(event) => setTail(Number(event.target.value))}><option value={100}>100</option><option value={400}>400</option><option value={1000}>1000</option><option value={2500}>2500</option></select><button onClick={() => setLive((value) => value === false)} title={live ? t(language, "pauseLive") : t(language, "resumeLive")}>{live ? <Pause size={16} /> : <Play size={16} />}{live ? t(language, "live") : t(language, "paused")}</button><button onClick={() => load()} disabled={loading}><RefreshCw size={16} />{t(language, "refresh")}</button></div></div><div className="logs-toolbar"><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, "filter")} /></div><label className="check-control"><input type="checkbox" checked={followScroll} onChange={(event) => setFollowScroll(event.target.checked)} />{t(language, "followScroll")}</label><span className="muted">{t(language, "tailLines")}: {tail}</span>{lastUpdate && <span className="muted">{t(language, "lastUpdate")}: {new Date(lastUpdate).toLocaleTimeString()}</span>}</div><div className="log-filter-buttons"><button className={allFiltersEnabled ? "filter-chip active" : "filter-chip"} onClick={() => setLogFilters(defaultLogFilters())}>{t(language, "allLogs")}</button>{logFilterTypes.map((type) => <button key={type} className={logFilters[type] ? "filter-chip active" : "filter-chip"} onClick={() => toggleLogFilter(type)}>{type.toUpperCase()}</button>)}</div>{error && <p className="error-text">{error}</p>}<div className="detections">{detections.slice(0, 8).map((item, index) => <span className="pill warn" key={index}>{item.type}</span>)}</div><pre className="log-view live-log" ref={logRef}>{filtered || t(language, "noResults")}</pre></section>;
+  return <section className="panel page-panel logs-panel"><div className="panel-head logs-head"><div><h2>{t(language, "navLogs")}</h2><span>{selected?.label ?? t(language, "logSource")} - {selected?.detail ?? source}</span></div><div className="logs-actions"><select value={source} onChange={(event) => setSource(event.target.value as LogSourceId)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select value={tail} onChange={(event) => setTail(Number(event.target.value))}><option value={100}>100</option><option value={400}>400</option><option value={1000}>1000</option><option value={2500}>2500</option></select><button onClick={() => setLive((value) => value === false)} title={live ? t(language, "pauseLive") : t(language, "resumeLive")}>{live ? <Pause size={16} /> : <Play size={16} />}{live ? t(language, "live") : t(language, "paused")}</button><button onClick={() => load()} disabled={loading}><RefreshCw size={16} />{t(language, "refresh")}</button></div></div><div className="logs-toolbar"><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, "filter")} /></div><label className="check-control"><input type="checkbox" checked={followScroll} onChange={(event) => setFollowScroll(event.target.checked)} />{t(language, "followScroll")}</label><span className="muted">{t(language, "tailLines")}: {tail}</span>{lastUpdate && <span className="muted">{t(language, "lastUpdate")}: {new Date(lastUpdate).toLocaleTimeString()}</span>}</div><div className="log-filter-buttons"><button className={allFiltersEnabled ? "filter-chip active" : "filter-chip"} onClick={() => setLogFilters(defaultLogFilters())}>{t(language, "allLogs")}</button>{logFilterTypes.map((type) => <button key={type} className={logFilters[type] ? "filter-chip active" : "filter-chip"} onClick={() => toggleLogFilter(type)}>{type.toUpperCase()} <span>{logCounts[type]}</span></button>)}</div>{error && <p className="error-text">{error}</p>}<pre className="log-view live-log" ref={logRef}>{filtered || t(language, "noResults")}</pre></section>;
 }
 
 

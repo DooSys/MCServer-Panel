@@ -2,6 +2,14 @@ import http from "node:http";
 import { Buffer } from "node:buffer";
 import { config } from "./config.js";
 
+export type DockerContainerInspect = {
+  id?: string;
+  name: string;
+  image?: string;
+  env: Record<string, string>;
+  error?: string;
+};
+
 export type DockerLogsResult = {
   container: string;
   content: string;
@@ -46,7 +54,7 @@ function stripDockerFrames(buffer: Buffer) {
   return buffer.toString("utf8").replace(/\u0000/g, "");
 }
 
-function dockerGet(path: string) {
+export function dockerGet(path: string) {
   return new Promise<{ statusCode: number; body: Buffer }>((resolve, reject) => {
     const request = http.request({
       socketPath: config.dockerSocketPath,
@@ -99,5 +107,32 @@ export async function readDockerContainerLogs(containerName: string, tail = conf
       generatedAt: new Date().toISOString(),
       tail: safeTail
     };
+  }
+}
+
+export async function inspectDockerContainer(containerName: string): Promise<DockerContainerInspect> {
+  const container = cleanContainerName(containerName);
+  try {
+    const response = await dockerGet("/containers/" + encodeURIComponent(container) + "/json");
+    const text = response.body.toString("utf8");
+    if (response.statusCode >= 400) {
+      let message = text.trim() || "Docker API HTTP " + response.statusCode;
+      try {
+        const parsed = JSON.parse(text) as { message?: string };
+        message = parsed.message ?? message;
+      } catch {
+        // Keep Docker plain text error.
+      }
+      return { name: container, env: {}, error: message };
+    }
+
+    const parsed = JSON.parse(text) as { Id?: string; Name?: string; Config?: { Image?: string; Env?: string[] } };
+    const env = Object.fromEntries((parsed.Config?.Env ?? []).map((item) => {
+      const index = item.indexOf("=");
+      return index === -1 ? [item, ""] : [item.slice(0, index), item.slice(index + 1)];
+    }));
+    return { id: parsed.Id, name: (parsed.Name ?? container).replace(/^\/+/, ""), image: parsed.Config?.Image, env };
+  } catch (error) {
+    return { name: container, env: {}, error: error instanceof Error ? error.message : "Docker API unavailable" };
   }
 }
