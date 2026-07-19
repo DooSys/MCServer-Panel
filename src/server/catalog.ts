@@ -1,7 +1,7 @@
 import { copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, CatalogVersion } from "../shared/types.js";
+import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, CatalogSearchResult, CatalogTypeSummary, CatalogVersion } from "../shared/types.js";
 import { auditLog } from "./audit.js";
 import { config } from "./config.js";
 import { inspectPackage } from "./packageInspector.js";
@@ -88,10 +88,10 @@ function flavorKey(serverFlavor?: string) {
   return String(serverFlavor ?? "").toLowerCase();
 }
 
-function compatibleTypes(serverFlavor?: string): CatalogProjectType[] {
+export function compatibleTypes(serverFlavor?: string): CatalogProjectType[] {
   const flavor = flavorKey(serverFlavor);
-  if (flavor.includes("fabric") || flavor.includes("forge") || flavor.includes("neoforge")) return ["mod", "datapack"];
-  if (flavor.includes("paper") || flavor.includes("purpur") || flavor.includes("spigot") || flavor.includes("bukkit")) return ["plugin", "datapack"];
+  if (flavor.includes("fabric") || flavor.includes("forge") || flavor.includes("neoforge")) return ["mod", "datapack", "resourcepack"];
+  if (flavor.includes("paper") || flavor.includes("purpur") || flavor.includes("spigot") || flavor.includes("bukkit")) return ["plugin", "datapack", "resourcepack"];
   return ["datapack", "resourcepack"];
 }
 
@@ -131,8 +131,8 @@ async function fetchJson<T>(url: URL): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function mapProject(hit: ModrinthSearchHit, serverFlavor?: string): CatalogProject {
-  const projectType = normalizeType(hit.project_type) ?? "datapack";
+function mapProject(hit: ModrinthSearchHit, serverFlavor?: string, forcedType?: CatalogProjectType): CatalogProject {
+  const projectType = forcedType ?? normalizeType(hit.project_type) ?? "datapack";
   const target = installTarget(projectType, serverFlavor);
   return {
     source: "modrinth",
@@ -153,47 +153,68 @@ function mapProject(hit: ModrinthSearchHit, serverFlavor?: string): CatalogProje
   };
 }
 
+function sideFacets(projectType: CatalogProjectType) {
+  if (projectType === "resourcepack") return ["client_side:required", "client_side:optional"];
+  return ["server_side:required", "server_side:optional"];
+}
+
 async function searchModrinthType(options: CatalogSearchOptions, projectType: CatalogProjectType) {
-  const url = new URL(`${MODRINTH_API}/search`);
-  const limit = clamp(options.limit, 1, 40);
+  const url = new URL(MODRINTH_API + "/search");
+  const limit = clamp(options.limit, 1, 100);
+  const offset = clamp(options.offset, 0, 5000);
   const version = cleanVersion(options.minecraftVersion);
-  const facets: string[][] = [[`project_type:${projectType}`]];
+  const facets: string[][] = [["all_project_types:" + projectType], sideFacets(projectType)];
   const categories = loaderCategories(projectType, options.serverFlavor);
 
-  if (version) facets.push([`versions:${version}`]);
-  if (categories.length) facets.push(categories.map((category) => `categories:${category}`));
+  if (version) facets.push(["versions:" + version]);
+  if (categories.length) facets.push(categories.map((category) => "categories:" + category));
 
   url.searchParams.set("limit", String(limit));
-  url.searchParams.set("offset", String(clamp(options.offset, 0, 5000)));
+  url.searchParams.set("offset", String(offset));
   url.searchParams.set("index", "downloads");
   url.searchParams.set("facets", JSON.stringify(facets));
   if (options.query?.trim()) url.searchParams.set("query", options.query.trim());
 
   const data = await fetchJson<{ hits: ModrinthSearchHit[]; total_hits: number }>(url);
-  return data.hits.map((hit) => mapProject(hit, options.serverFlavor));
+  const projects = data.hits.map((hit) => mapProject(hit, options.serverFlavor, projectType));
+  return {
+    projects,
+    summary: {
+      projectType,
+      totalHits: data.total_hits ?? projects.length,
+      returned: projects.length,
+      limit,
+      offset
+    } satisfies CatalogTypeSummary
+  };
 }
 
-export async function searchCatalog(options: CatalogSearchOptions) {
+export async function searchCatalog(options: CatalogSearchOptions): Promise<CatalogSearchResult> {
   if (!config.enableCatalog) throw Object.assign(new Error("Catalog is disabled"), { status: 403 });
 
   const requested = normalizeType(options.projectType);
   const allowed = compatibleTypes(options.serverFlavor);
   const types = requested ? [requested] : allowed;
-  const projects = requested
-    ? await searchModrinthType(options, requested)
-    : (await Promise.all(types.map((type) => searchModrinthType({ ...options, offset: 0 }, type)))).flat();
-
-  const offset = requested ? 0 : clamp(options.offset, 0, 5000);
-  const limit = clamp(options.limit, 1, 40);
-  const sorted = projects.sort((a, b) => b.downloads - a.downloads).slice(offset, offset + limit);
+  const limit = clamp(options.limit, 1, 100);
+  const offset = clamp(options.offset, 0, 5000);
+  const results = await Promise.all(types.map((type) => searchModrinthType({ ...options, limit, offset: requested ? offset : 0 }, type)));
+  const summaries = results.map((result) => result.summary);
+  const projects = results
+    .flatMap((result) => result.projects)
+    .sort((a, b) => b.downloads - a.downloads);
 
   return {
-    source: "modrinth" as const,
+    source: "modrinth",
     provider: "Modrinth",
     serverFlavor: options.serverFlavor ?? "Unknown",
     minecraftVersion: cleanVersion(options.minecraftVersion) || "Unknown",
     compatibleTypes: allowed,
-    projects: sorted
+    queriedTypes: types,
+    totalHits: summaries.reduce((total, item) => total + item.totalHits, 0),
+    returned: projects.length,
+    limitPerType: limit,
+    typeSummaries: summaries,
+    projects
   };
 }
 

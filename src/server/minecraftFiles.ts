@@ -67,6 +67,7 @@ export function detectLogEvents(content: string): LogDetection[] {
       if (lower.includes("error")) return [{ type: "error" as const, line }];
       if (lower.includes("warn")) return [{ type: "warn" as const, line }];
       if (lower.includes("rcon")) return [{ type: "rcon" as const, line }];
+      if (lower.includes("info")) return [{ type: "info" as const, line }];
       if (lower.includes("crash")) return [{ type: "crash" as const, line }];
       if (lower.includes("joined the game")) return [{ type: "join" as const, line }];
       if (lower.includes("not white-listed")) return [{ type: "whitelist" as const, line }];

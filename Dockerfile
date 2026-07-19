@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG NODE_VERSION=22-alpine
-ARG APP_VERSION=1.1.7
+ARG APP_VERSION=1.1.16
 ARG PB_VERSION=0.38.2
 
 FROM node:${NODE_VERSION} AS build
@@ -16,7 +16,7 @@ ARG APP_VERSION
 ARG PB_VERSION
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.title="MCServer Panel" \
+LABEL org.opencontainers.image.title="MCServer-panel" \
   org.opencontainers.image.description="Modern web panel for itzg/minecraft-server with RCON, PocketBase and controlled addon management." \
   org.opencontainers.image.source="https://github.com/DooSys/MCServer-Panel" \
   org.opencontainers.image.version="${APP_VERSION}"

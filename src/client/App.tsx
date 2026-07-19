@@ -1,21 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, Moon, PackageSearch, Pause, Play, RefreshCw, Save, Search, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
+import { Blocks, ChevronRight, CloudSun, Download, ExternalLink, FileText, Gauge, History, ListChecks, LogOut, MessageSquare, PackageSearch, Pause, Play, RefreshCw, Save, Search, Sun, Server, Shield, TerminalSquare, Upload, Users } from 'lucide-react';
 import { apiFetch, loginWithPassword, pb, postJson } from './api';
 import { localizeRule, normalizeLanguage, profileLabel, t } from './i18n';
 import type { Language, TranslationKey } from './i18n';
-import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, GameruleState, LogPayload, LogSource, LogSourceId, PlayerSummary, ServerStatus } from '../shared/types';
+import type { AddonPackage, CatalogInstallResult, CatalogProject, CatalogProjectType, CatalogSearchResult, GameruleState, LogPayload, LogSource, LogSourceId, PlayerSummary, ServerStatus } from '../shared/types';
 import { RECOMMENDED_PROFILES } from '../shared/gamerules';
 
 type Page = 'dashboard' | 'console' | 'players' | 'gamerules' | 'addons' | 'catalog' | 'files' | 'logs' | 'settings' | 'users';
 type Toast = { type: 'ok' | 'error'; message: string } | null;
 type PageProps = { status: ServerStatus | null; setToast: (toast: Toast) => void; refreshStatus: () => Promise<void>; language: Language };
 
+const brandIcon = '/assets/mcserver-panel-icon.jpg';
+const brandLockup = '/assets/mcserver-panel-lockup.jpg';
+
 const nav: Array<{ key: Page; label: TranslationKey; icon: typeof Gauge }> = [
   { key: 'dashboard', label: 'navDashboard', icon: Gauge }, { key: 'console', label: 'navConsole', icon: TerminalSquare }, { key: 'players', label: 'navPlayers', icon: Users }, { key: 'gamerules', label: 'navRules', icon: ListChecks }, { key: 'addons', label: 'navAddons', icon: Blocks }, { key: 'catalog', label: 'navCatalog', icon: PackageSearch }, { key: 'files', label: 'navFiles', icon: FileText }, { key: 'logs', label: 'navLogs', icon: History }, { key: 'settings', label: 'navSettings', icon: Server }, { key: 'users', label: 'navUsers', icon: Shield }
 ];
-const commonCommands = ['list', 'save-all', 'say ', 'gamerule keepInventory true', 'whitelist list', 'time set day', 'weather clear', 'difficulty normal'];
+const commonCommands = ['list', 'save-all', 'say ', 'gamerule keep_inventory true', 'whitelist list', 'time set day', 'weather clear', 'difficulty normal'];
 const catalogTypeLabels: Record<CatalogProjectType, TranslationKey> = { datapack: 'typeDatapack', plugin: 'typePlugin', mod: 'typeMod', resourcepack: 'typeResourcepack' };
+const logFilterTypes = ['info', 'warn', 'error', 'rcon', 'join', 'whitelist', 'datapack', 'save', 'crash', 'other'] as const;
+type LogFilterType = typeof logFilterTypes[number];
+
+function defaultLogFilters() {
+  return Object.fromEntries(logFilterTypes.map((type) => [type, true])) as Record<LogFilterType, boolean>;
+}
+
+function classifyLogLine(line: string): LogFilterType[] {
+  const lower = line.toLowerCase();
+  const types: LogFilterType[] = [];
+  if (lower.includes('error')) types.push('error');
+  if (lower.includes('warn')) types.push('warn');
+  if (lower.includes('rcon')) types.push('rcon');
+  if (lower.includes('info')) types.push('info');
+  if (lower.includes('crash')) types.push('crash');
+  if (lower.includes('joined the game')) types.push('join');
+  if (lower.includes('not white-listed')) types.push('whitelist');
+  if (lower.includes('datapack')) types.push('datapack');
+  if (lower.includes('saved the game') || lower.includes('saved the world')) types.push('save');
+  return types.length ? types : ['other'];
+}
+
 
 export function App() {
   const [language, setLanguageState] = useState<Language>(() => normalizeLanguage(localStorage.getItem('mc-panel-language')));
@@ -38,7 +63,7 @@ export function App() {
 
   const Current = { dashboard: Dashboard, console: ConsolePage, players: PlayersPage, gamerules: GamerulesPage, addons: AddonsPage, catalog: CatalogPage, files: FilesPage, logs: LogsPage, settings: SettingsPage, users: UsersPage }[page];
 
-  return <div className="app-shell"><aside className="sidebar"><div className="brand"><Server size={24} /><span>MCServer Panel</span></div><nav>{nav.map((item) => { const Icon = item.icon; return <button className={page === item.key ? 'active' : ''} key={item.key} onClick={() => setPage(item.key)}><Icon size={18} />{t(language, item.label)}</button>; })}</nav><button className="ghost bottom" onClick={() => { pb.authStore.clear(); setLoggedIn(false); }}><LogOut size={18} />{t(language, 'logout')}</button></aside><main><TopBar status={status} onRefresh={refreshStatus} language={language} setLanguage={setLanguage} />{toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}<Current status={status} setToast={setToast} refreshStatus={refreshStatus} language={language} /></main></div>;
+  return <div className="app-shell"><aside className="sidebar"><div className="brand"><img className="brand-mark" src={brandIcon} alt="" /><span>MCServer-panel</span></div><nav>{nav.map((item) => { const Icon = item.icon; return <button className={page === item.key ? 'active' : ''} key={item.key} onClick={() => setPage(item.key)}><Icon size={18} /><span>{t(language, item.label)}</span></button>; })}</nav><button className="ghost bottom" onClick={() => { pb.authStore.clear(); setLoggedIn(false); }}><LogOut size={18} /><span>{t(language, 'logout')}</span></button></aside><main><TopBar status={status} onRefresh={refreshStatus} language={language} setLanguage={setLanguage} />{toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}<Current status={status} setToast={setToast} refreshStatus={refreshStatus} language={language} /></main></div>;
 }
 
 function LanguageSwitch({ language, setLanguage }: { language: Language; setLanguage: (language: Language) => void }) {
@@ -48,7 +73,7 @@ function LanguageSwitch({ language, setLanguage }: { language: Language; setLang
 function Login({ language, setLanguage }: { language: Language; setLanguage: (language: Language) => void }) {
   const [identity, setIdentity] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
   async function submit(event: FormEvent) { event.preventDefault(); if (loading) return; setError(''); setLoading(true); try { await loginWithPassword(identity, password); } catch (err) { setError(err instanceof Error ? err.message : t(language, 'loginFailed')); } finally { setLoading(false); } }
-  return <div className="login-screen"><form className="login-card" onSubmit={submit}><div className="login-top"><div className="brand big"><Server size={28} /><span>MCServer Panel</span></div><LanguageSwitch language={language} setLanguage={setLanguage} /></div><label>{t(language, 'emailOrUser')}<input value={identity} onChange={(event) => setIdentity(event.target.value)} autoFocus disabled={loading} /></label><label>{t(language, 'password')}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" disabled={loading} /></label>{error && <p className="error-text">{error}</p>}<button className="primary" disabled={loading}>{loading ? 'Connexion...' : t(language, 'login')}</button></form></div>;
+  return <div className="login-screen"><form className="login-card" onSubmit={submit}><div className="login-top"><img className="login-logo" src={brandLockup} alt="MCServer-panel" /><LanguageSwitch language={language} setLanguage={setLanguage} /></div><label>{t(language, 'emailOrUser')}<input value={identity} onChange={(event) => setIdentity(event.target.value)} autoFocus disabled={loading} /></label><label>{t(language, 'password')}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" disabled={loading} /></label>{error && <p className="error-text">{error}</p>}<button className="primary" disabled={loading}>{loading ? t(language, 'signingIn') : t(language, 'login')}</button></form></div>;
 }
 
 
@@ -79,13 +104,13 @@ function Dashboard({ status, setToast, refreshStatus, language }: PageProps) {
     [t(language, 'dockerImage'), `${status?.dockerImage ?? 'itzg/minecraft-server'}:${status?.dockerImageTag ?? '?'}`, status?.imageUpdate?.message ?? t(language, 'updateStatus')]
   ];
   async function action(action: string, message?: string) { try { const data = await postJson<{ result: string }>('/server/quick-action', { action, message }); setToast({ type: 'ok', message: data.result || t(language, 'actionDone') }); await refreshStatus(); } catch (error) { setToast({ type: 'error', message: error instanceof Error ? error.message : t(language, 'error') }); } }
-  return <section className="page-grid"><div className="metric-grid">{cards.map(([label, value, detail]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><section className="panel wide"><div className="panel-head"><h2>{t(language, 'quickActions')}</h2><span>{t(language, 'controlledRcon')}</span></div><div className="quick-actions"><button onClick={() => action('save_all')}><Save size={17} />save-all</button><button onClick={() => action('time_day')}><Moon size={17} />{t(language, 'day')}</button><button onClick={() => action('weather_clear')}><CloudSun size={17} />{t(language, 'clearWeather')}</button></div><div className="inline-form"><input placeholder={t(language, 'serverMessage')} value={say} onChange={(event) => setSay(event.target.value)} /><button onClick={() => action('say', say)}><MessageSquare size={17} />{t(language, 'send')}</button></div></section></section>;
+  return <section className="page-grid"><div className="metric-grid">{cards.map(([label, value, detail]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><section className="panel wide"><div className="panel-head"><h2>{t(language, 'quickActions')}</h2><span>{t(language, 'controlledRcon')}</span></div><div className="quick-actions"><button onClick={() => action('save_all')}><Save size={17} />{t(language, 'saveWorld')}</button><button onClick={() => action('time_day')}><Sun size={17} />{t(language, 'day')}</button><button onClick={() => action('weather_clear')}><CloudSun size={17} />{t(language, 'clearWeather')}</button></div><div className="inline-form"><input placeholder={t(language, 'serverMessage')} value={say} onChange={(event) => setSay(event.target.value)} /><button onClick={() => action('say', say)}><MessageSquare size={17} />{t(language, 'send')}</button></div></section></section>;
 }
 
 function ConsolePage({ setToast, language }: PageProps) {
   const [command, setCommand] = useState('list'); const [history, setHistory] = useState<Array<{ command: string; result: string }>>([]);
   async function run(event?: FormEvent) { event?.preventDefault(); try { const data = await postJson<{ result: string }>('/rcon/command', { command }); setHistory((items) => [{ command, result: data.result }, ...items].slice(0, 30)); setCommand(''); } catch (error) { setToast({ type: 'error', message: error instanceof Error ? error.message : t(language, 'commandRejected') }); } }
-  return <section className="panel page-panel"><div className="panel-head"><h2>{t(language, 'rconConsole')}</h2><span>{t(language, 'rconConsoleHint')}</span></div><form className="console-input" onSubmit={run}><TerminalSquare size={18} /><input list="commands" value={command} onChange={(event) => setCommand(event.target.value)} /><datalist id="commands">{commonCommands.map((item) => <option key={item} value={item} />)}</datalist><button><Play size={16} />Run</button></form><div className="terminal">{history.map((item, index) => <div key={`${item.command}-${index}`}><b>&gt; {item.command}</b><pre>{item.result || 'OK'}</pre></div>)}</div></section>;
+  return <section className="panel page-panel"><div className="panel-head"><h2>{t(language, 'rconConsole')}</h2><span>{t(language, 'rconConsoleHint')}</span></div><form className="console-input" onSubmit={run}><TerminalSquare size={18} /><input list="commands" value={command} onChange={(event) => setCommand(event.target.value)} /><datalist id="commands">{commonCommands.map((item) => <option key={item} value={item} />)}</datalist><button><Play size={16} />{t(language, 'runCommand')}</button></form><div className="terminal">{history.map((item, index) => <div key={`${item.command}-${index}`}><b>&gt; {item.command}</b><pre>{item.result || 'OK'}</pre></div>)}</div></section>;
 }
 
 function GamerulesPage({ setToast, language }: PageProps) {
@@ -118,6 +143,7 @@ function CatalogPage({ status, setToast, language }: PageProps) {
   const [query, setQuery] = useState('');
   const [projectType, setProjectType] = useState<'all' | CatalogProjectType>('all');
   const [projects, setProjects] = useState<CatalogProject[]>([]);
+  const [catalogInfo, setCatalogInfo] = useState<CatalogSearchResult | null>(null);
   const [compatibleTypes, setCompatibleTypes] = useState<CatalogProjectType[]>([]);
   const [loading, setLoading] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
@@ -126,10 +152,11 @@ function CatalogPage({ status, setToast, language }: PageProps) {
     event?.preventDefault();
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '18' });
+      const params = new URLSearchParams({ limit: '100' });
       if (query.trim()) params.set('query', query.trim());
       if (projectType !== 'all') params.set('projectType', projectType);
-      const data = await apiFetch<{ projects: CatalogProject[]; compatibleTypes: CatalogProjectType[] }>(`/catalog/search?${params.toString()}`);
+      const data = await apiFetch<CatalogSearchResult>(`/catalog/search?${params.toString()}`);
+      setCatalogInfo(data);
       setProjects(data.projects);
       setCompatibleTypes(data.compatibleTypes);
     } catch (error) {
@@ -160,7 +187,8 @@ function CatalogPage({ status, setToast, language }: PageProps) {
 
   const typeOptions = ['all', ...(compatibleTypes.length ? compatibleTypes : ['datapack', 'plugin', 'mod'])] as Array<'all' | CatalogProjectType>;
 
-  return <section className="panel page-panel"><div className="panel-head"><div><h2>{t(language, 'catalogTitle')}</h2><span>{t(language, 'catalogHint')} {status?.serverFlavor ?? t(language, 'unknown')} / {status?.minecraftVersion ?? t(language, 'unknown')}</span></div><form className="catalog-toolbar" onSubmit={load}><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, 'catalogSearch')} /></div><select value={projectType} onChange={(event) => setProjectType(event.target.value as 'all' | CatalogProjectType)}>{typeOptions.map((item) => <option key={item} value={item}>{item === 'all' ? t(language, 'allTypes') : t(language, catalogTypeLabels[item])}</option>)}</select><button><Search size={16} />{t(language, 'filter')}</button></form></div>{loading ? <p className="muted">{t(language, 'loading')}</p> : <div className="catalog-grid">{projects.length ? projects.map((project) => <article className="catalog-card" key={project.id}>{project.iconUrl ? <img src={project.iconUrl} alt="" /> : <PackageSearch size={34} />}<div><div className="catalog-title"><strong>{project.title}</strong><span className="pill">{t(language, catalogTypeLabels[project.projectType])}</span></div><p>{project.description}</p><div className="catalog-meta"><span>{project.downloads.toLocaleString()} {t(language, 'downloads')}</span><span>{project.versions.slice(0, 3).join(', ')}</span></div></div><div className="catalog-actions"><a className="icon-link" href={`https://modrinth.com/${project.projectType}/${project.slug}`} target="_blank" title={t(language, 'openSource')}><ExternalLink size={17} /></a><button disabled={!project.installable || installing === project.id} onClick={() => install(project)} title={project.installWarning ?? t(language, 'install')}><Download size={16} />{project.installable ? t(language, 'install') : t(language, 'incompatible')}</button></div></article>) : <p className="muted">{t(language, 'noResults')}</p>}</div>}</section>;
+  const typeSummary = catalogInfo?.typeSummaries ?? [];
+  return <section className="panel page-panel"><div className="panel-head"><div><h2>{t(language, 'catalogTitle')}</h2><span>{t(language, 'catalogHint')} {catalogInfo?.serverFlavor ?? status?.serverFlavor ?? t(language, 'unknown')} / {catalogInfo?.minecraftVersion ?? status?.minecraftVersion ?? t(language, 'unknown')}</span>{catalogInfo && <div className="catalog-summary"><span>{catalogInfo.provider}: {catalogInfo.returned}/{catalogInfo.totalHits} {t(language, 'catalogCompatibleResults')}</span>{typeSummary.map((item) => <span className="mini-tag" key={item.projectType}>{t(language, catalogTypeLabels[item.projectType])}: {item.returned}/{item.totalHits}</span>)}</div>}</div><form className="catalog-toolbar" onSubmit={load}><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, 'catalogSearch')} /></div><select value={projectType} onChange={(event) => setProjectType(event.target.value as 'all' | CatalogProjectType)}>{typeOptions.map((item) => <option key={item} value={item}>{item === 'all' ? t(language, 'allTypes') : t(language, catalogTypeLabels[item])}</option>)}</select><button><Search size={16} />{t(language, 'filter')}</button></form></div>{loading ? <p className="muted">{t(language, 'loading')}</p> : <div className="catalog-grid">{projects.length ? projects.map((project) => <article className="catalog-card" key={project.id}>{project.iconUrl ? <img src={project.iconUrl} alt="" /> : <PackageSearch size={34} />}<div><div className="catalog-title"><strong>{project.title}</strong><span className="pill">{t(language, catalogTypeLabels[project.projectType])}</span></div><p>{project.description}</p><div className="catalog-tags">{project.categories.slice(0, 5).map((category) => <span className="mini-tag" key={category}>{category}</span>)}</div><div className="catalog-meta"><span>{project.downloads.toLocaleString()} {t(language, 'downloads')}</span><span>{project.versions.slice(0, 5).join(', ')}</span><span>{project.serverSide ? `server: ${project.serverSide}` : ''}</span></div></div><div className="catalog-actions"><a className="icon-link" href={`https://modrinth.com/${project.projectType}/${project.slug}`} target="_blank" title={t(language, 'openSource')}><ExternalLink size={17} /></a><button disabled={!project.installable || installing === project.id} onClick={() => install(project)} title={project.installWarning ?? t(language, 'install')}><Download size={16} />{project.installable ? t(language, 'install') : t(language, 'incompatible')}</button></div></article>) : <p className="muted">{t(language, 'noResults')}</p>}</div>}</section>;
 }
 
 function FilesPage({ setToast, language }: PageProps) {
@@ -177,13 +205,14 @@ function LogsPage({ setToast, language }: PageProps) {
   const [tail, setTail] = useState(400);
   const [live, setLive] = useState(true);
   const [followScroll, setFollowScroll] = useState(true);
+  const [logFilters, setLogFilters] = useState<Record<LogFilterType, boolean>>(() => defaultLogFilters());
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState("");
   const [error, setError] = useState("");
   const logRef = useRef<HTMLPreElement | null>(null);
 
   async function load(silent = false) {
-    if (!silent) setLoading(true);
+    if (silent === false) setLoading(true);
     try {
       const data = await apiFetch<LogPayload>("/logs/" + source + "?tail=" + tail);
       setContent(data.content);
@@ -195,7 +224,7 @@ function LogsPage({ setToast, language }: PageProps) {
       setError(message);
       setToast({ type: "error", message });
     } finally {
-      if (!silent) setLoading(false);
+      if (silent === false) setLoading(false);
     }
   }
 
@@ -206,13 +235,21 @@ function LogsPage({ setToast, language }: PageProps) {
   }, []);
 
   useEffect(() => { load().catch(() => undefined); }, [source, tail]);
-  useEffect(() => { if (!live) return; const timer = window.setInterval(() => load(true).catch(() => undefined), 2500); return () => window.clearInterval(timer); }, [source, tail, live]);
+  useEffect(() => { if (live === false) return; const timer = window.setInterval(() => load(true).catch(() => undefined), 2500); return () => window.clearInterval(timer); }, [source, tail, live]);
   useEffect(() => { if (followScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [content, query, followScroll]);
 
-  const filtered = useMemo(() => content.split(/\r?\n/).filter((line) => line.toLowerCase().includes(query.toLowerCase())).join("\n"), [content, query]);
+  const filtered = useMemo(() => content.split(/\r?\n/).filter((line) => {
+    if (line.toLowerCase().includes(query.toLowerCase()) === false) return false;
+    return classifyLogLine(line).some((type) => logFilters[type]);
+  }).join("\n"), [content, query, logFilters]);
   const selected = sources.find((item) => item.id === source);
+  const allFiltersEnabled = logFilterTypes.every((type) => logFilters[type]);
 
-  return <section className="panel page-panel logs-panel"><div className="panel-head logs-head"><div><h2>{t(language, "navLogs")}</h2><span>{selected?.label ?? t(language, "logSource")} - {selected?.detail ?? source}</span></div><div className="logs-actions"><select value={source} onChange={(event) => setSource(event.target.value as LogSourceId)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select value={tail} onChange={(event) => setTail(Number(event.target.value))}><option value={100}>100</option><option value={400}>400</option><option value={1000}>1000</option><option value={2500}>2500</option></select><button onClick={() => setLive((value) => !value)} title={live ? t(language, "pauseLive") : t(language, "resumeLive")}>{live ? <Pause size={16} /> : <Play size={16} />}{live ? t(language, "live") : t(language, "paused")}</button><button onClick={() => load()} disabled={loading}><RefreshCw size={16} />{t(language, "refresh")}</button></div></div><div className="logs-toolbar"><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, "filter")} /></div><label className="check-control"><input type="checkbox" checked={followScroll} onChange={(event) => setFollowScroll(event.target.checked)} />{t(language, "followScroll")}</label><span className="muted">{t(language, "tailLines")}: {tail}</span>{lastUpdate && <span className="muted">{t(language, "lastUpdate")}: {new Date(lastUpdate).toLocaleTimeString()}</span>}</div>{error && <p className="error-text">{error}</p>}<div className="detections">{detections.slice(0, 8).map((item, index) => <span className="pill warn" key={index}>{item.type}</span>)}</div><pre className="log-view live-log" ref={logRef}>{filtered || t(language, "noResults")}</pre></section>;
+  function toggleLogFilter(type: LogFilterType) {
+    setLogFilters((current) => ({ ...current, [type]: current[type] === false }));
+  }
+
+  return <section className="panel page-panel logs-panel"><div className="panel-head logs-head"><div><h2>{t(language, "navLogs")}</h2><span>{selected?.label ?? t(language, "logSource")} - {selected?.detail ?? source}</span></div><div className="logs-actions"><select value={source} onChange={(event) => setSource(event.target.value as LogSourceId)}>{sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select value={tail} onChange={(event) => setTail(Number(event.target.value))}><option value={100}>100</option><option value={400}>400</option><option value={1000}>1000</option><option value={2500}>2500</option></select><button onClick={() => setLive((value) => value === false)} title={live ? t(language, "pauseLive") : t(language, "resumeLive")}>{live ? <Pause size={16} /> : <Play size={16} />}{live ? t(language, "live") : t(language, "paused")}</button><button onClick={() => load()} disabled={loading}><RefreshCw size={16} />{t(language, "refresh")}</button></div></div><div className="logs-toolbar"><div className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t(language, "filter")} /></div><label className="check-control"><input type="checkbox" checked={followScroll} onChange={(event) => setFollowScroll(event.target.checked)} />{t(language, "followScroll")}</label><span className="muted">{t(language, "tailLines")}: {tail}</span>{lastUpdate && <span className="muted">{t(language, "lastUpdate")}: {new Date(lastUpdate).toLocaleTimeString()}</span>}</div><div className="log-filter-buttons"><button className={allFiltersEnabled ? "filter-chip active" : "filter-chip"} onClick={() => setLogFilters(defaultLogFilters())}>{t(language, "allLogs")}</button>{logFilterTypes.map((type) => <button key={type} className={logFilters[type] ? "filter-chip active" : "filter-chip"} onClick={() => toggleLogFilter(type)}>{type.toUpperCase()}</button>)}</div>{error && <p className="error-text">{error}</p>}<div className="detections">{detections.slice(0, 8).map((item, index) => <span className="pill warn" key={index}>{item.type}</span>)}</div><pre className="log-view live-log" ref={logRef}>{filtered || t(language, "noResults")}</pre></section>;
 }
 
 

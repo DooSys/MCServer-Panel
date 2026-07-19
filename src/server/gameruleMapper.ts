@@ -1,4 +1,4 @@
-const explicitMap: Record<string, string> = {
+const legacyCamelMap: Record<string, string> = {
   keep_inventory: "keepInventory",
   do_fire_tick: "doFireTick",
   mob_griefing: "mobGriefing",
@@ -23,8 +23,16 @@ const explicitMap: Record<string, string> = {
   log_admin_commands: "logAdminCommands"
 };
 
+function toCamelGamerule(key: string) {
+  return legacyCamelMap[key] ?? key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+export function minecraftGameruleAliases(key: string) {
+  return Array.from(new Set([key, toCamelGamerule(key)]));
+}
+
 export function toMinecraftGamerule(key: string) {
-  return explicitMap[key] ?? key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+  return minecraftGameruleAliases(key)[0];
 }
 
 export function parseGameruleValue(response: string) {

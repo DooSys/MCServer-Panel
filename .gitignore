@@ -6,3 +6,4 @@ pb_data/
 uploads/
 *.log
 .DS_Store
+.codex-remote-attachments/

@@ -49,6 +49,7 @@ export type GameruleDefinition = {
 
 export type GameruleState = GameruleDefinition & {
   currentValue: string | null;
+  minecraftKey?: string;
   available: boolean;
   error?: string;
 };
@@ -92,6 +93,28 @@ export type CatalogProject = {
   installWarning?: string;
 };
 
+export type CatalogTypeSummary = {
+  projectType: CatalogProjectType;
+  totalHits: number;
+  returned: number;
+  limit: number;
+  offset: number;
+};
+
+export type CatalogSearchResult = {
+  source: CatalogSource;
+  provider: string;
+  serverFlavor: string;
+  minecraftVersion: string;
+  compatibleTypes: CatalogProjectType[];
+  queriedTypes: CatalogProjectType[];
+  totalHits: number;
+  returned: number;
+  limitPerType: number;
+  typeSummaries: CatalogTypeSummary[];
+  projects: CatalogProject[];
+};
+
 export type CatalogVersion = {
   source: CatalogSource;
   projectId: string;
@@ -120,7 +143,7 @@ export type CatalogInstallResult = {
 };
 
 export type LogDetection = {
-  type: "error" | "warn" | "rcon" | "crash" | "join" | "whitelist" | "datapack" | "save";
+  type: "info" | "error" | "warn" | "rcon" | "crash" | "join" | "whitelist" | "datapack" | "save";
   line: string;
 };
 

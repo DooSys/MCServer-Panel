@@ -7,7 +7,7 @@ import type { AddonPackage, LogPayload, LogSource, LogSourceId, PlayerSummary, S
 import { auditLog } from "./audit.js";
 import { getCatalogVersions, installCatalogPackage, searchCatalog } from "./catalog.js";
 import { config } from "./config.js";
-import { toMinecraftGamerule, parseGameruleValue } from "./gameruleMapper.js";
+import { minecraftGameruleAliases, parseGameruleValue } from "./gameruleMapper.js";
 import { readDockerContainerLogs } from "./dockerLogs.js";
 import { detectLogEvents, latestLog, listDatapacks, readJsonFile, readServerProperties, readTextFile } from "./minecraftFiles.js";
 import { inspectPackage } from "./packageInspector.js";
@@ -108,6 +108,50 @@ async function readLogPayload(sourceId: LogSourceId, tail: number): Promise<LogP
     tail: dockerLogs.tail,
     error: dockerLogs.error
   };
+}
+
+function assertValidGameruleResponse(result: string, minecraftKey: string) {
+  const lower = result.toLowerCase();
+  const invalid = [
+    "unknown rule",
+    "unknown gamerule",
+    "no such gamerule",
+    "incorrect argument",
+    "unknown or incomplete command"
+  ].some((fragment) => lower.includes(fragment));
+  if (invalid) {
+    throw new Error("Gamerule " + minecraftKey + " unavailable: " + result.trim());
+  }
+}
+
+async function readGameruleValue(key: string) {
+  let lastError: unknown;
+  for (const minecraftKey of minecraftGameruleAliases(key)) {
+    try {
+      const result = await runRcon("gamerule " + minecraftKey);
+      assertValidGameruleResponse(result, minecraftKey);
+      const value = parseGameruleValue(result);
+      if (value === null) throw new Error("Gamerule " + minecraftKey + " returned no value");
+      return { minecraftKey, value, result };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Gamerule unavailable");
+}
+
+async function writeGameruleValue(key: string, value: string) {
+  let lastError: unknown;
+  for (const minecraftKey of minecraftGameruleAliases(key)) {
+    try {
+      const result = await runRcon("gamerule " + minecraftKey + " " + value);
+      assertValidGameruleResponse(result, minecraftKey);
+      return { minecraftKey, result };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Gamerule unavailable");
 }
 
 async function statusPayload(): Promise<ServerStatus> {
@@ -270,9 +314,8 @@ apiRouter.post("/rcon/command", asyncRoute(async (request, response) => {
 apiRouter.get("/gamerules", asyncRoute(async (_request, response) => {
   const rules = await Promise.all(GAMERULES.map(async (definition) => {
     try {
-      const minecraftKey = toMinecraftGamerule(definition.key);
-      const result = await runRcon(`gamerule ${minecraftKey}`);
-      return { ...definition, currentValue: parseGameruleValue(result), available: true };
+      const state = await readGameruleValue(definition.key);
+      return { ...definition, minecraftKey: state.minecraftKey, currentValue: state.value, available: true };
     } catch (error) {
       return { ...definition, currentValue: null, available: false, error: error instanceof Error ? error.message : "Unavailable" };
     }
@@ -298,10 +341,9 @@ apiRouter.post("/gamerules/:key", asyncRoute(async (request, response) => {
     return;
   }
 
-  const minecraftKey = toMinecraftGamerule(definition.key);
-  const result = await runRcon(`gamerule ${minecraftKey} ${value}`);
-  await auditLog({ user: request.userId, action: "gamerule.update", payload: { key: definition.key, value }, result });
-  response.json({ result });
+  const state = await writeGameruleValue(definition.key, value);
+  await auditLog({ user: request.userId, action: "gamerule.update", payload: { key: definition.key, minecraftKey: state.minecraftKey, value }, result: state.result });
+  response.json({ result: state.result, minecraftKey: state.minecraftKey });
 }));
 
 apiRouter.get("/players", asyncRoute(async (_request, response) => {
@@ -387,7 +429,7 @@ apiRouter.get("/catalog/search", asyncRoute(async (request, response) => {
     projectType: projectType === "all" ? "" : projectType,
     serverFlavor: String(request.query.serverFlavor ?? status.serverFlavor ?? ""),
     minecraftVersion: String(request.query.minecraftVersion ?? status.minecraftVersion ?? ""),
-    limit: Number(request.query.limit ?? 18),
+    limit: Number(request.query.limit ?? 100),
     offset: Number(request.query.offset ?? 0)
   }));
 }));

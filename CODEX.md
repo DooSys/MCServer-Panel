@@ -1,4 +1,4 @@
-# Codex Maintenance Notes - MCServer Panel
+# Codex Maintenance Notes - MCServer-panel
 
 ## Workspace
 
@@ -9,7 +9,7 @@
 
 ## Current Version
 
-- App version starts at `1.1.13`.
+- App version starts at `1.1.16`.
 - Versioning policy: semver `MAJOR.MINOR.PATCH`.
 - Increment `PATCH` for every correction/fix.
 - Keep these locations aligned when changing version:
@@ -25,7 +25,7 @@
 Useful version command:
 
 ```bash
-npm version 1.1.13 --no-git-tag-version
+npm version 1.1.16 --no-git-tag-version
 ```
 
 Then update Docker/docs references to the same version.
@@ -47,7 +47,7 @@ Then update Docker/docs references to the same version.
 - GitHub Actions workflow: `.github/workflows/docker-image.yml`.
 - Push to `main` publishes `latest`.
 - Git tag `vX.Y.Z` publishes semver tags.
-- Synology compose should consume a pinned release tag such as `ghcr.io/doosys/mcserver-panel:1.1.13` during validation.
+- Synology compose should consume a pinned release tag such as `ghcr.io/doosys/mcserver-panel:1.1.16` during validation.
 - `docker-compose.example.yml` is panel-only; it must not define or manage the `itzg/minecraft-server` service during Synology validation.
 - The existing Minecraft container should be attached once to `MCServer-panel-net` with `docker network connect MCServer-panel-net minecraft`, avoiding a game server reboot.
 - If GHCR package is private, Synology needs `docker login ghcr.io` with a GitHub token that can `read:packages`.
@@ -57,10 +57,10 @@ Release commands from WSL:
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.13"
+git commit -m "Release 1.1.16"
 git push origin main
-git tag v1.1.13
-git push origin v1.1.13
+git tag v1.1.16
+git push origin v1.1.16
 ```
 
 ## Validation Commands
@@ -112,7 +112,7 @@ Notes:
 
 - Modrinth code exists but is considered optional for now.
 - Synology example sets:
-  - `ENABLE_CATALOG=false`
+  - `ENABLE_CATALOG=true`
   - `ENABLE_CATALOG_INSTALL=false`
 - Re-enable later once base Docker/Synology validation is stable.
 - Install targets when enabled:
@@ -144,27 +144,48 @@ Notes:
 
 ## Logs Integration
 
-- Version 1.1.13 adds /panel-api/logs/sources and /panel-api/logs/:source.
+- Version 1.1.16 adds /panel-api/logs/sources and /panel-api/logs/:source.
 - Sources are minecraft-container, panel-container, and minecraft-latest.
 - Docker container logs use the Docker Engine API over DOCKER_SOCKET_PATH; Synology compose mounts /var/run/docker.sock read-only.
-- UI supports source selection, filter, live refresh, tail size, and auto-scroll pause.
+- UI supports source selection, text filter, type chips (INFO/WARN/ERROR/RCON/etc.), live refresh, tail size, and auto-scroll pause.
 
 ## PocketBase Admin Proxy
 
-- Version 1.1.13 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
+- Version 1.1.16 proxies PocketBase admin at /_/ because the PocketBase dashboard calls root /api/collections endpoints.
 - Root PocketBase API prefixes /api are proxied before MCServer-panel API auth middleware.
 - The old /pb proxy remains for the app PocketBase client, but UI links should point to /_/ for PocketBase admin.
 - Frontend apiFetch clears stale PocketBase tokens on 401 auth/session/token errors, which avoids repeated Invalid PocketBase session toasts after a container restart or password rotation.
 
 ## PocketBase Auth Regression Notes
 
-- Version 1.1.13 separates browser auth storage: MCServer-panel uses `mcserver_panel_auth`; PocketBase admin keeps the default `pocketbase_auth`.
+- Version 1.1.16 separates browser auth storage: MCServer-panel uses `mcserver_panel_auth`; PocketBase admin keeps the default `pocketbase_auth`.
 - The client removes legacy non-superuser `pocketbase_auth` values left by earlier panel builds, preventing the PocketBase admin UI from opening with a panel user token.
 - Backend `requireAuth` forwards refreshed PocketBase tokens in `x-pocketbase-token` and `x-pocketbase-record`; the frontend saves them after API calls.
 - This avoids immediate logout after `auth-refresh` and avoids repeated `Invalid PocketBase session` messages caused by stale rotated tokens.
 
+## Gamerule Compatibility
+
+- Version 1.1.16 reads and writes gamerules by trying the project snake_case key first, then the legacy camelCase alias.
+- This matters for newer Minecraft syntax such as `keep_inventory`; older servers can still fall back to `keepInventory`.
+- API responses include `minecraftKey` so the UI/backend can know which key the server accepted.
+
 ## API Namespace Split
 
-- Since 1.1.13, PocketBase owns `/api` and `/_/` at the public panel host.
+- Since 1.1.16, PocketBase owns `/api` and `/_/` at the public panel host.
 - MCServer-panel backend endpoints are mounted under `/panel-api`.
 - Frontend `apiFetch` must call `/panel-api`, not `/api`, to avoid breaking PocketBase admin dashboard calls such as `/api/settings`, `/api/health`, `/api/logs`, and `/api/collections`.
+
+## Catalog Compatibility
+
+- Version 1.1.16 expands Modrinth catalog search to 100 results per compatible type.
+- Catalog search is driven by detected `serverFlavor` and `minecraftVersion` from `/panel-api/server/status`.
+- Search facets include `all_project_types`, detected `versions`, runtime loader categories, and server/client side compatibility.
+- The UI shows provider, returned/total counts, per-type counts, categories, supported versions and server-side metadata.
+- `ENABLE_CATALOG=true` enables read/search; `ENABLE_CATALOG_INSTALL=false` keeps installation disabled while validating.
+
+## Visual Identity
+
+- Version 1.1.16 refreshes the visual identity around the supplied MCServer-panel artwork.
+- Public assets live under public/assets/mcserver-panel-icon.jpg and public/assets/mcserver-panel-lockup.jpg.
+- Temporary Codex attachment folders are ignored with .codex-remote-attachments/.
+- Keep UI labels user-facing; avoid raw command labels on primary buttons unless the command itself is the content.
