@@ -2,7 +2,7 @@
 
 MCServer-panel est une interface web moderne pour administrer un serveur Minecraft Java existant base sur `itzg/minecraft-server`. Le panel tourne dans son propre conteneur, communique avec Minecraft via RCON, lit/ecrit de facon controlee dans le volume `/mc-data`, et embarque PocketBase pour les comptes, les preferences et l'audit applicatif.
 
-Version actuelle : `1.1.17`.
+Version actuelle : `1.1.18`.
 
 ## Objectif du projet
 
@@ -62,7 +62,7 @@ Le Dockerfile est multi-stage :
 Build local manuel :
 
 ```bash
-docker build --build-arg APP_VERSION=1.1.17 -t ghcr.io/doosys/mcserver-panel:1.1.17 .
+docker build --build-arg APP_VERSION=1.1.18 -t ghcr.io/doosys/mcserver-panel:1.1.18 .
 ```
 
 Test local rapide apres build :
@@ -73,7 +73,7 @@ docker run --rm -p 8088:8080 \
   -e RCON_PASSWORD=dev \
   -v "$PWD/.tmp/mc-data:/mc-data" \
   -v "$PWD/.tmp/pb_data:/app/pb_data" \
-  ghcr.io/doosys/mcserver-panel:1.1.17
+  ghcr.io/doosys/mcserver-panel:1.1.18
 ```
 
 ## Publication GitHub
@@ -83,7 +83,7 @@ Le workflow `.github/workflows/docker-image.yml` publie l'image sur GitHub Conta
 Tags produits :
 
 - `ghcr.io/doosys/mcserver-panel:latest` sur `main` ;
-- `ghcr.io/doosys/mcserver-panel:1.1.17` avec un tag Git `v1.1.17` ;
+- `ghcr.io/doosys/mcserver-panel:1.1.18` avec un tag Git `v1.1.18` ;
 - `ghcr.io/doosys/mcserver-panel:1.1` ;
 - tag court base sur le SHA.
 
@@ -92,10 +92,10 @@ Commandes de release typiques depuis WSL :
 ```bash
 git status
 git add .
-git commit -m "Release 1.1.17"
+git commit -m "Release 1.1.18"
 git push origin main
-git tag v1.1.17
-git push origin v1.1.17
+git tag v1.1.18
+git push origin v1.1.18
 ```
 
 GitHub Actions doit avoir le droit `packages: write`, deja defini dans le workflow. Si l'image GHCR est privee, le Synology devra faire un `docker login ghcr.io` avec un token GitHub ayant le droit `read:packages`.
@@ -159,7 +159,7 @@ http://IP_DU_SERVEUR:8088/_/
 | `PANEL_DATA_PATH` | `/volume1/docker/MCServer-panel/data` | Donnees persistantes du panel et de PocketBase |
 | `MC_DOCKER_NETWORK` | `minecraft_default` | Reseau Docker externe commun avec Minecraft |
 | `MC_DATA_PATH` | `/mc-data` | Chemin interne du volume Minecraft dans le panel |
-| `PANEL_IMAGE_TAG` | `1.1.17` | Tag de l image MCServer-panel utilise par le compose Synology |
+| `PANEL_IMAGE_TAG` | `1.1.18` | Tag de l image MCServer-panel utilise par le compose Synology |
 | `MINECRAFT_UPDATE_CHECK` | `true` | Verifie si la version Minecraft/Paper detectee est a jour |
 | `CATALOG_DISABLED` | `false` | Coupe la recherche externe Modrinth si defini a `true` |
 | `ENABLE_CATALOG_INSTALL` | `false` dans compose | Autorise l installation depuis le catalogue vers `/mc-data` |
@@ -222,7 +222,7 @@ Pour les deux sources Docker, le socket Docker doit etre monte en lecture seule 
 
 Variables associees : MC_CONTAINER_NAME, PANEL_CONTAINER_NAME, DOCKER_SOCKET_PATH et LOG_TAIL_LINES.
 
-Note auth navigateur : depuis 1.1.17, le panel et PocketBase admin utilisent deux stockages separes. Si une ancienne session reste bloquee, ouvrir d abord le panel une fois nettoie automatiquement l ancienne session panel stockee dans PocketBase admin.
+Note auth navigateur : depuis 1.1.18, le panel et PocketBase admin utilisent deux stockages separes. Si une ancienne session reste bloquee, ouvrir d abord le panel une fois nettoie automatiquement l ancienne session panel stockee dans PocketBase admin.
 
 ## Routage API
 

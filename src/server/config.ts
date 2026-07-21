@@ -13,13 +13,13 @@ export const config = {
   dockerSocketPath: process.env.DOCKER_SOCKET_PATH ?? "/var/run/docker.sock",
   logTailLines: Number(process.env.LOG_TAIL_LINES ?? 400),
   enableMinecraftUpdateCheck: process.env.MINECRAFT_UPDATE_CHECK !== "false",
-  appVersion: process.env.APP_VERSION ?? "1.1.17",
+  appVersion: process.env.APP_VERSION ?? "1.1.18",
   appDockerImage: "ghcr.io/doosys/mcserver-panel",
-  appDockerTag: process.env.APP_VERSION ?? "1.1.17",
+  appDockerTag: process.env.APP_VERSION ?? "1.1.18",
   panelUpdateStatus: process.env.PANEL_UPDATE_STATUS ?? "not_checked",
   enableCatalog: process.env.CATALOG_DISABLED !== "true",
   enableCatalogInstall: process.env.ENABLE_CATALOG_INSTALL === "true",
-  catalogUserAgent: "MCServer-Panel/" + (process.env.APP_VERSION ?? "1.1.17") + " (https://github.com/DooSys/MCServer-Panel)"
+  catalogUserAgent: "MCServer-Panel/" + (process.env.APP_VERSION ?? "1.1.18") + " (https://github.com/DooSys/MCServer-Panel)"
 };
 
 export function assertRuntimeConfig() {

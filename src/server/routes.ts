@@ -75,10 +75,10 @@ async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 3500): Promise<T
 async function minecraftUpdateStatus(serverFlavor: string, minecraftVersion: string) {
   const current = minecraftVersion && minecraftVersion !== "Unknown" ? minecraftVersion : "";
   if (!config.enableMinecraftUpdateCheck) {
-    return { status: "not_checked" as const, message: "Verification desactivee" };
+    return { status: "not_checked" as const, message: "Vérification désactivée" };
   }
   if (!current) {
-    return { status: "not_configured" as const, message: "Version Minecraft non detectee" };
+    return { status: "not_configured" as const, message: "Version Minecraft non détectée" };
   }
 
   const flavor = serverFlavor.toLowerCase();
@@ -87,7 +87,7 @@ async function minecraftUpdateStatus(serverFlavor: string, minecraftVersion: str
       const data = await fetchJsonWithTimeout<{ versions: string[] }>("https://api.papermc.io/v2/projects/paper");
       const latest = data.versions.at(-1);
       return latest === current
-        ? { status: "current" as const, message: "Paper a jour (" + latest + ")", checkedAt: new Date().toISOString() }
+        ? { status: "current" as const, message: "Paper à jour (" + latest + ")", checkedAt: new Date().toISOString() }
         : { status: "update_available" as const, message: "Paper " + latest + " disponible", checkedAt: new Date().toISOString() };
     }
 
@@ -95,13 +95,13 @@ async function minecraftUpdateStatus(serverFlavor: string, minecraftVersion: str
       const data = await fetchJsonWithTimeout<{ latest: { release: string } }>("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
       const latest = data.latest.release;
       return latest === current
-        ? { status: "current" as const, message: "Minecraft a jour (" + latest + ")", checkedAt: new Date().toISOString() }
+        ? { status: "current" as const, message: "Minecraft à jour (" + latest + ")", checkedAt: new Date().toISOString() }
         : { status: "update_available" as const, message: "Minecraft " + latest + " disponible", checkedAt: new Date().toISOString() };
     }
 
-    return { status: "unknown" as const, message: "Verification non disponible pour " + serverFlavor };
+    return { status: "unknown" as const, message: "Vérification non disponible pour " + serverFlavor };
   } catch (error) {
-    return { status: "unknown" as const, message: "Verification impossible: " + (error instanceof Error ? error.message : "erreur reseau"), checkedAt: new Date().toISOString() };
+    return { status: "unknown" as const, message: "Vérification impossible: " + (error instanceof Error ? error.message : "erreur réseau"), checkedAt: new Date().toISOString() };
   }
 }
 
